@@ -43,6 +43,7 @@ I'd love the League table to have
 
 if (!Array.prototype.sum) {
   Array.prototype.sum = function() {
+    if (!this.length) return 0
     return this.reduce(function(a, b) { return a + b})
   }
 }
@@ -71,7 +72,7 @@ function Player(id, name) {
   /**
    * Number of games won.
    */
-  this.wins = []
+  this.wins = 0
 }
 
 Player.prototype.toObject = function() {
@@ -89,6 +90,12 @@ Player.fromObject = function(obj) {
 Player.prototype.nextGame = function() {
   this.scores.push(0)
   this.bonusPoints.push(0)
+}
+
+Player.prototype.resetScores = function() {
+  this.scores = []
+  this.bonusPoints = []
+  this.wins = 0
 }
 
 /**
@@ -124,15 +131,18 @@ Player.prototype.getGamesPlayed = function() {
 
 Player.prototype.getAveragePointsPerGame = function() {
   var scores = this.getGameScores()
+  if (!scores.length) return 0
   return (scores.sum() / scores.length).toFixed(1)
 }
 
-Player.prototype.getBountyPoints = function() {
-  return this.bountyPoints.sum()
+Player.prototype.getBonusPoints = function() {
+  return this.bonusPoints.sum()
 }
 
 Player.prototype.getLowestWeeklyPoints = function() {
-  return Math.min.apply(Math, this.getGameScores())
+  var scores = this.getGameScores()
+  if (!scores.length) return 0
+  return Math.min.apply(Math, scores)
 }
 
 Player.prototype.getOverallScore = function() {
@@ -221,7 +231,7 @@ Game.BOUNTY_BONUS = 1
 Game.prototype.getPaidPlayers = function() {
   // Determine how many players should get paid
   var playerCount = this.players.length
-  var paid = (playerCount - (playerCount % 3)) / 3)
+  var paid = (playerCount - (playerCount % 3)) / 3
   return players.slice(0, paid)
 }
 
@@ -255,7 +265,7 @@ Game.prototype.calculateScores = function() {
  * Calculates bonus points based on the given player ending up in the money
  * after losing the previous game.
  */
-Game.protype.calculateFishChipBonus = function(player) {
+Game.prototype.calculateFishChipBonus = function(player) {
   var fishChipBonus = 0
   if (this.fishChipper !== null) {
     var paidPlayers = this.getPaidPlayers()
@@ -270,7 +280,7 @@ Game.protype.calculateFishChipBonus = function(player) {
  * Calculates bonus points based on the given player having knocked out a
  * bounty player.
  */
-Game.protype.calculateBountyBonus = function(player) {
+Game.prototype.calculateBountyBonus = function(player) {
   var bountyBonus = 0
   if (this.bountyPlayers !== null) {
     for (var i = 0, l = this.knockouts.length; i < l; i++) {
@@ -294,12 +304,14 @@ function calculateScores(players, games) {
     , bountyPlayers = null
     , fishChipper = null
 
+  players.forEach(function(player) { player.resetScores() })
   for (var i = 0, l = games.length; i < l; i++) {
     players.forEach(function(player) { player.nextGame() })
     game = games[i]
     if (previousGame !== null) {
       game.setPreviousGameInfo(previousGame)
     }
+    game.calculateScores()
     previousGame = game
   }
 }
@@ -323,17 +335,175 @@ function createLeagueTable(players) {
   }
   // Sort by overall points, descending
   table.sort(function(a, b) { return b[6] - a[6] })
-  table.splice(0, 0, headings)
-  return table
+  return {headings: headings, rows: table}
 }
 
 // ------------------------------------------------------------------- State ---
 
-var players = JSON.parse(localStorage.getItem('players')).map(Player.fromObject)
+var players = JSON.parse(localStorage.getItem('players')||'[]').map(Player.fromObject)
 
-var games = JSON.parse(localStorage.getItem('games')).map(Game.fromObject.bind(null, players))
+var games = JSON.parse(localStorage.getItem('games')||'[]').map(Game.fromObject.bind(null, players))
 
-function save() {
+function savePlayers() {
   localStorage.setItem('players', JSON.stringify(players.map(function(p) { return p.toObject() })))
+}
+
+function saveGames() {
   localStorage.setItem('games', JSON.stringify(games.map(function(g) { return g.toObject() })))
 }
+
+// --------------------------------------------------------------- Templates ---
+
+var templateAPI = DOMBuilder.modes.template.api
+
+var EventHandlerNode = templateAPI.TemplateNode.extend({
+  constructor: function(func, args) {
+    args = args || []
+    this.func = func
+    this.args = []
+    for (var i = 0, l = args.length; i < l; i++) {
+      if (args[i] instanceof templateAPI.Variable) {
+        this.args.push(args[i])
+      }
+      else {
+        this.args.push(new templateAPI.TextNode(args[i]))
+      }
+    }
+  }
+
+  /**
+   * Looks up arguments values from the template context and returns a function
+   * which will call the handler with the configured arguments and any arguments
+   * passed to the event handling function.
+   */
+, render: function(context) {
+    var func = this.func, args = []
+    for (var i = 0, l = this.args.length; i < l; i++) {
+      if (this.args[i] instanceof templateAPI.Variable) {
+        args.push(this.args[i].resolve(context))
+      }
+      else {
+        args.push(this.args[i].render(context).join(''))
+      }
+
+    }
+    return function() {
+      this.func.apply(this, args.concat(Array.prototype.slice.call(arguments, 0)))
+    }.bind(this)
+  }
+})
+
+/**
+ * Provides access to construct an EventHandlerNode in templates.
+ */
+DOMBuilder.template.$handler = function(func) {
+  return new EventHandlerNode(func, Array.prototype.slice.call(arguments, 1))
+}
+
+var template = DOMBuilder.template
+with (template) {
+  $template('league_table'
+  , H1('League Table')
+  , TABLE({'class': 'table table-striped table-bordered table-condensed'}
+    , THEAD(
+        TR(
+          TH('Name')
+        , TH('Games Played')
+        , TH('Wins')
+        , TH('Average Points Per Game')
+        , TH('Bonus Points')
+        , TH('Lowest Weekly Points')
+        , TH('Overall Points')
+        )
+      )
+    , TBODY($for('player in players'
+      , TR(
+          TD(A({click: $handler(displayPlayer, $var('player'))}, '{{player.name }}'))
+        , TD('{{ player.getGamesPlayed }}')
+        , TD('{{ player.wins }}')
+        , TD('{{ player.getAveragePointsPerGame }}')
+        , TD('{{ player.getBonusPoints }}')
+        , TD('{{ player.getLowestWeeklyPoints }}')
+        , TD('{{ player.getOverallScore }}')
+        )
+      ))
+    )
+  , FORM({id: 'addPlayerForm', 'class': 'form-horizontal', submit: $handler(addPlayer)}
+    , FIELDSET(
+        LEGEND('Add Player')
+      , DIV({'class': 'control-group'}
+        , LABEL({'class': 'control-label', 'for': 'name'}, 'Name')
+        , DIV({'class': 'controls'}
+          , INPUT({'class:': 'input-large', type: 'text', name: 'name', id: 'name'})
+          )
+        )
+      , DIV({'class': 'form-actions'}
+        , BUTTON({'class': 'btn btn-primary', type: 'submit'}, 'Add Player')
+        )
+      )
+    )
+  )
+
+  $template('player_details'
+  , H1('{{ player.name }}')
+  )
+
+  $template('game_list'
+  , H1('Games')
+  )
+
+  $template('game_details'
+  , H1('Game {{ gameNumber }}')
+  )
+}
+
+// ------------------------------------------------------- Make Stuff Happen ---
+
+function stop(e) {
+  e.preventDefault()
+  e.stopPropagation()
+}
+
+function displayContent(templateName, contextVariables) {
+  var el = document.getElementById('contents')
+  el.innerHTML = ''
+  el.appendChild(template.renderTemplate(templateName, contextVariables))
+}
+
+function leagueTable(e) {
+  if (e) stop(e)
+  displayContent('league_table', {
+    players: players.slice(0)
+                    .sort(function(a, b) {
+                      return b.getOverallScore() - a.getOverallScore()
+                    })
+  })
+}
+
+function addPlayer(e) {
+  if (e) stop(e)
+  var form = document.getElementById('addPlayerForm')
+  if (!form.elements.name.value) return alert('Name is required to add a new player.')
+  players.push(new Player(players.length, form.elements.name.value))
+  savePlayers()
+  calculateScores(players, games)
+  leagueTable()
+}
+
+function displayPlayer(player, e) {
+  if (e) stop(e)
+  displayContent('player_details', {player: player})
+}
+
+function gamesList(e) {
+  if (e) stop(e)
+  displayContent('game_list', {games: games})
+}
+
+// -------------------------------------------------------------------- Boot ---
+
+document.getElementById('navLeague').onclick = leagueTable
+document.getElementById('navGames').onclick = gamesList
+
+calculateScores(players, games)
+leagueTable()

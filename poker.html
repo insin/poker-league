@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <title>Poker League</title>
-<script src="poker.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="http://twitter.github.com/bootstrap/assets/css/bootstrap.css">
 <style>
@@ -13,10 +12,16 @@ body {
 <div class="navbar navbar-fixed-top">
   <div class="navbar-inner">
     <div class="container">
-      <a href="#" class="brand">Poker League</a>
+      <a id="navLeague" href="#" class="brand">Poker League</a>
+      <ul class="nav">
+        <li><a id="navGames" href="#games">Games</a></li>
+      </ul>
     </div>
   </div>
 </div>
 
-<div class="container">
+<div class="container" id="contents">
 </div>
+
+<script src="https://raw.github.com/insin/DOMBuilder/master/dist/DOMBuilder.template.js"></script>
+<script src="poker.js"></script>
