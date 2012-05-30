@@ -42,10 +42,12 @@ I'd love the League table to have
 // ------------------------------------------------------------------- Utils ---
 
 if (!Array.prototype.sum) {
-  Array.prototype.sum = function() {
-    if (!this.length) return 0
-    return this.reduce(function(a, b) { return a + b})
-  }
+  Object.defineProperty(Array.prototype, 'sum', {
+    value: function() {
+      if (!this.length) return 0
+      return this.reduce(function(a, b) { return a + b})
+    }
+  })
 }
 
 // ------------------------------------------------------------------ Player ---
@@ -73,6 +75,10 @@ function Player(id, name) {
    * Number of games won.
    */
   this.wins = 0
+}
+
+Player.prototype.toString = function() {
+  return this.name
 }
 
 Player.prototype.toObject = function() {
@@ -163,7 +169,7 @@ function Game(players, knockouts) {
    * Record who knocked out who, [perp, victim], for distribution of bonus
    * points.
    */
-  this.knockouts = knockouts
+  this.knockouts = knockouts || []
   /**
    * Top 3 players from last game who are playing this game.
    */
@@ -228,11 +234,15 @@ Game.FISH_CHIP_BONUS = 1
  */
 Game.BOUNTY_BONUS = 1
 
+Game.prototype.getWinner = function() {
+  return this.players[0]
+}
+
 Game.prototype.getPaidPlayers = function() {
   // Determine how many players should get paid
   var playerCount = this.players.length
   var paid = (playerCount - (playerCount % 3)) / 3
-  return players.slice(0, paid)
+  return this.players.slice(0, paid)
 }
 
 Game.prototype.calculateScores = function() {
@@ -248,6 +258,18 @@ Game.prototype.calculateScores = function() {
       extraPoints--
     }
   }
+
+  if (this.bountyPlayers !== null) {
+    console.log('Bounties issued for: ' + this.bountyPlayers.join(', ') + '. Dead or alive!')
+  }
+  if (this.fishChipper !== null) {
+    console.log(this.fishChipper.name + ' has the fish-chip.')
+  }
+  console.group('Position Scores')
+  console.table([this.players.join(',').split(','), points])
+  console.groupEnd()
+  console.log(this.getWinner() + ' wins!')
+  console.log('In the money: ' + this.getPaidPlayers().join(', '))
 
   for (var i = 0, l = this.players.length; i < l; i++) {
     var player = this.players[i]
@@ -267,9 +289,10 @@ Game.prototype.calculateScores = function() {
  */
 Game.prototype.calculateFishChipBonus = function(player) {
   var fishChipBonus = 0
-  if (this.fishChipper !== null) {
+  if (player === this.fishChipper) {
     var paidPlayers = this.getPaidPlayers()
     if (paidPlayers.indexOf(player) != -1) {
+      console.log(player + ' gets a bonus point for cashing in with the fish-chip!')
       fishChipBonus += Game.FISH_CHIP_BONUS
     }
   }
@@ -286,6 +309,7 @@ Game.prototype.calculateBountyBonus = function(player) {
     for (var i = 0, l = this.knockouts.length; i < l; i++) {
       var knockout = this.knockouts[i]
       if (knockout[0] === player && this.bountyPlayers.indexOf(knockout[1]) != -1) {
+        console.log(player + ' calls in the bounty on ' + knockout[1] + '!')
         bountyBonus += Game.BOUNTY_BONUS
       }
     }
@@ -306,6 +330,7 @@ function calculateScores(players, games) {
 
   players.forEach(function(player) { player.resetScores() })
   for (var i = 0, l = games.length; i < l; i++) {
+    console.group('Game #' + (i + 1))
     players.forEach(function(player) { player.nextGame() })
     game = games[i]
     if (previousGame !== null) {
@@ -313,29 +338,8 @@ function calculateScores(players, games) {
     }
     game.calculateScores()
     previousGame = game
+    console.groupEnd()
   }
-}
-
-function createLeagueTable(players) {
-  var headings = ['Name', 'Games Played', 'Wins', 'Average Points Per Game',
-                  'Bounty Points', 'Current Individual Lowest Weekly Points',
-                  'Overall Points']
-  var table = []
-  for (var i = 0, l = players.length; i < l; i++) {
-    var player = players[i]
-    table.push([
-      player.name,
-    , player.getGamesPlayed()
-    , player.getWins()
-    , player.getAveragePointsPerGame()
-    , player.getBountyPoints()
-    , player.getLowestWeeklyPoints()
-    , player.getOverallScore()
-    ])
-  }
-  // Sort by overall points, descending
-  table.sort(function(a, b) { return b[6] - a[6] })
-  return {headings: headings, rows: table}
 }
 
 // ------------------------------------------------------------------- State ---
@@ -405,20 +409,18 @@ with (template) {
   $template('league_table'
   , H1('League Table')
   , TABLE({'class': 'table table-striped table-bordered table-condensed'}
-    , THEAD(
-        TR(
-          TH('Name')
-        , TH('Games Played')
-        , TH('Wins')
-        , TH('Average Points Per Game')
-        , TH('Bonus Points')
-        , TH('Lowest Weekly Points')
-        , TH('Overall Points')
-        )
-      )
+    , THEAD(TR(
+        TH('Name')
+      , TH('Games Played')
+      , TH('Wins')
+      , TH('Average Points Per Game')
+      , TH('Bonus Points')
+      , TH('Lowest Weekly Points')
+      , TH('Overall Points')
+      ))
     , TBODY($for('player in players'
       , TR(
-          TD(A({click: $handler(displayPlayer, $var('player'))}, '{{player.name }}'))
+          TD(A({href: '#', click: $handler(displayPlayer, $var('player'))}, '{{player.name }}'))
         , TD('{{ player.getGamesPlayed }}')
         , TD('{{ player.wins }}')
         , TD('{{ player.getAveragePointsPerGame }}')
@@ -450,10 +452,77 @@ with (template) {
 
   $template('game_list'
   , H1('Games')
+  , TABLE({'class': 'table table-striped table-bordered table-condensed'}
+    , THEAD(TR(
+        TH('#')
+      , TH('Winner')
+      ))
+    , TBODY($for('game in games'
+      , TR(
+          TD(A({href: '#', click: $handler(displayGame, $var('game'))}, 'Game #{{ forloop.counter }}'))
+        , TD('{{ game.getWinner.name }}')
+        )
+      ))
+    )
+  , FORM({id: 'addGameForm', 'class': 'form-horizontal', submit: $handler(addGame)}
+    , FIELDSET(
+        LEGEND('Add Game')
+      , DIV({'class': 'control-group'}
+        , LABEL({'class': 'control-label'}, 'Results')
+        , DIV({'class': 'controls'}
+          , TABLE({'class': 'table table-condensed'}
+            , THEAD(TR(
+                TH('Player')
+              , TH('Position')
+              ))
+            , TBODY($for('player in players'
+              , TR(
+                  TD('{{ player.name }}')
+                , TD(INPUT({type: 'text', name: 'position', 'class': 'input-mini'}))
+                )
+              ))
+            )
+          )
+        )
+      , DIV({'class': 'control-group'}
+        , LABEL({'class': 'control-label'}, 'Knockouts')
+        , DIV({'class': 'controls'}
+          , DIV(
+              SELECT({'name': 'perp'}
+              , OPTION({value: ''}, '----')
+              , $for('player in players'
+                , OPTION({value: '{{ player.id }}'}, '{{ player.name }}')
+                )
+              )
+            , ' knocked out '
+            , SELECT({'name': 'victim'}
+              , OPTION({value: ''}, '----')
+              , $for('player in players'
+                , OPTION({value: '{{ player.id }}'}, '{{ player.name }}')
+                )
+              )
+            )
+          , BUTTON({'class': 'btn btn-success', type: 'button', click: function(e) {
+              var ko = this.parentNode.firstChild.cloneNode(true)
+              var el = DOMBuilder.dom
+              ko.appendChild(
+                 el.BUTTON({'class': 'btn btn-danger', type: 'button', click: function(e) {
+                  this.parentNode.parentNode.removeChild(this.parentNode)
+                 }}, el.I({'class': 'icon-minus'}))
+              )
+              this.parentNode.insertBefore(ko, this)
+            }}, I({'class': 'icon-plus'}))
+          )
+        )
+      , DIV({'class': 'form-actions'}
+        , BUTTON({'class': 'btn btn-primary', type: 'submit'}, 'Add Game')
+        )
+      )
+    )
   )
 
   $template('game_details'
-  , H1('Game {{ gameNumber }}')
+  , H1('Game #{{ gameNumber }}')
   )
 }
 
@@ -492,12 +561,61 @@ function addPlayer(e) {
 
 function displayPlayer(player, e) {
   if (e) stop(e)
-  displayContent('player_details', {player: player})
+  displayContent('player_details', {
+    player: player
+  })
 }
 
 function gamesList(e) {
   if (e) stop(e)
-  displayContent('game_list', {games: games})
+  displayContent('game_list', {
+    games: games
+  , players: players
+  })
+}
+
+function addGame(e) {
+  if (e) stop(e)
+  var form = document.getElementById('addGameForm')
+  // Assign players to a positions array, winner first
+  var playerPositions = []
+  Array.prototype.forEach.call(form.elements.position, function(el, playerIndex) {
+    if (el.value != '') {
+      var position = parseInt(el.value, 10)
+      playerPositions[position - 1] = players[playerIndex]
+    }
+  })
+  // Set up record of important knockouts
+  var knockouts = []
+    , perps = form.elements.perp
+    , victims = form.elements.victim
+  if (typeof perps.length == 'undefined') {
+    perps = [perps]
+    victims = [victims]
+  }
+  for (var i = 0, l = perps.length; i < l; i++) {
+    var perp = perps[i].value
+      , victim = victims[i].value
+    if (perp != '' && victim != '' && perp != victim) {
+      knockouts.push([
+        players[parseInt(perp, 10)]
+      , players[parseInt(victim, 10)]
+      ])
+    }
+  }
+
+  games.push(new Game(playerPositions, knockouts))
+  saveGames()
+  calculateScores(players, games)
+  gamesList()
+}
+
+function displayGame(game, e) {
+  if (e) stop(e)
+  displayContent('game_details', {
+    game: game
+  , gameNumber: games.indexOf(game) + 1
+  })
 }
 
 // -------------------------------------------------------------------- Boot ---
