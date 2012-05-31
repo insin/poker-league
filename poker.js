@@ -44,8 +44,7 @@ I'd love the League table to have
 if (!Array.prototype.sum) {
   Object.defineProperty(Array.prototype, 'sum', {
     value: function() {
-      if (!this.length) return 0
-      return this.reduce(function(a, b) { return a + b})
+      return this.reduce(function(a, b) { return a + b}, 0)
     }
   })
 }
@@ -61,20 +60,6 @@ function Player(id, name) {
    * The player's name.
    */
   this.name = name
-  /**
-   * Scores for each game the player has played in, 0 indicates they didn't
-   * play.
-   */
-  this.scores = []
-  /**
-   * Bounty points for each game the player has played in, 0 indicates they
-   * didn't play.
-   */
-  this.bonusPoints = []
-  /**
-   * Number of games won.
-   */
-  this.wins = 0
 }
 
 Player.prototype.toString = function() {
@@ -89,82 +74,190 @@ Player.fromObject = function(obj) {
   return new Player(obj.id, obj.name)
 }
 
+// ------------------------------------------------------------------- Score ---
+
 /**
- * Inserts scores for the next game, defaulting to the player not having played
- * in it.
+ * Scoring for a Player in a sequence of games.
  */
-Player.prototype.nextGame = function() {
-  this.scores.push(0)
-  this.bonusPoints.push(0)
+function Score(player) {
+  /**
+   * The player this score is for.
+   */
+  this.player = player
+  /**
+   * Scores for each game the player has played in, by game index.
+   */
+  this.scores = []
+  /**
+   * Bounty points for each game the player has played in, by game index.
+   */
+  this.bonusPoints = []
+  /**
+   * Number of games won by the player.
+   */
+  this.wins = 0
 }
 
-Player.prototype.resetScores = function() {
+/**
+ * Gets a Score object for the given player, or creates and adds one.
+ */
+Score.getOrCreate = function(player, scores) {
+  // Look for an existing Score
+  for (var i = 0, l = scores.length; i < l; i++) {
+    if (player === scores[i].player) {
+      return scores[i]
+    }
+  }
+  // Otherwise, create and add a new Score
+  var score = new Score(player)
+  scores.push(score)
+  return score
+}
+
+Score.prototype.reset = function() {
   this.scores = []
   this.bonusPoints = []
   this.wins = 0
 }
 
 /**
- * Updates the score for the current game.
+ * Registers the score for the given game.
  */
-Player.prototype.setScore = function(score) {
-  this.scores.pop()
-  this.scores.push(score)
+Score.prototype.setScore = function(game, score) {
+  this.scores[game.index] = score
 }
 
 /**
- * Updates bonus points for the current game.
+ * Registers bonus points earned for the given game.
  */
-Player.prototype.setBonusPoints = function(bonusPoints) {
-  this.bonusPoints.pop()
-  this.bonusPoints.push(bonusPoints)
+Score.prototype.setBonusPoints = function(game, bonusPoints) {
+  this.bonusPoints[game.index] = bonusPoints
 }
 
 /**
  * Registers that the player won a game.
  */
-Player.prototype.win = function() {
+Score.prototype.win = function() {
   this.wins++
 }
 
-Player.prototype.getGameScores = function() {
-  return this.scores.filter(function(score) { return score !== 0})
+/**
+ * Fiters undefined values out of the scores array, which is sparse.
+ */
+Score.prototype.getGameScores = function() {
+  return this.scores.filter(function(s) { return typeof s != 'undefined'})
 }
 
-Player.prototype.getGamesPlayed = function() {
+Score.prototype.getGamesPlayed = function() {
   return this.getGameScores().length
 }
 
-Player.prototype.getAveragePointsPerGame = function() {
+Score.prototype.getAveragePointsPerGame = function() {
   var scores = this.getGameScores()
   if (!scores.length) return 0
   return (scores.sum() / scores.length).toFixed(1)
 }
 
-Player.prototype.getBonusPoints = function() {
+Score.prototype.getBonusPoints = function() {
   return this.bonusPoints.sum()
 }
 
-Player.prototype.getLowestWeeklyPoints = function() {
+Score.prototype.getLowestWeeklyPoints = function() {
   var scores = this.getGameScores()
   if (!scores.length) return 0
   return Math.min.apply(Math, scores)
 }
 
-Player.prototype.getOverallScore = function() {
+Score.prototype.getOverallScore = function() {
   return this.getGameScores().slice(0)                              // Make a copy
                              .sort(function(a, b) { return b - a }) // Sort in descending order
                              .slice(0, 9)                           // Only take the top 9
                              .sum()                                 // Add 'em up
 }
 
+// ------------------------------------------------------------------ Season ---
+
+/**
+ * A 12 week season of poker games.
+ */
+function Season(name) {
+  /**
+   * Whimsy, the obvious, whatever you like.
+   */
+  this.name = name
+  /**
+   * Games played in this season.
+   */
+  this.games = []
+  /**
+   * Scores for players who've played in this season.
+   */
+  this.scores = []
+}
+
+Season.prototype.toObject = function() {
+  return {
+    name: this.name
+  , games: this.games.map(function(g) { return g.toObject() })
+  }
+}
+
+Season.fromObject = function(players, obj) {
+  var season = new Season(obj.name)
+  obj.games.forEach(function(gameObj) {
+    season.addGame(Game.fromObject(players, gameObj), false)
+  })
+  season.sortScores
+  return season
+}
+
+/**
+ * Adds a game and calculates its scores.
+ */
+Season.prototype.addGame = function(game, sortScores) {
+  // If this is not the first game, let it know about the previous game
+  if (this.games.length) {
+    game.setPreviousGameInfo(this.games[this.games.length - 1])
+  }
+  // Let the game know which index it's going to live at
+  game.index = this.games.length
+  // Link back to this season
+  game.season = this
+  this.games.push(game)
+  game.calculateScores(this.scores)
+  if (!sortScores) {
+    this.sortScores()
+  }
+}
+
+/**
+ * Sorts scores based on overall score.
+ */
+Season.prototype.sortScores = function() {
+  this.scores.sort(function(a, b) {
+    return b.getOverallScore() - a.getOverallScore()
+  })
+}
+
 // -------------------------------------------------------------------- Game ---
 
-function Game(players, knockouts) {
+function Game(date, results, knockouts) {
+  /**
+   * The season this game belongs to.
+   */
+  this.season = null
+  /**
+   * Index of this game in its Season's games.
+   */
+  this.index = null
+  /**
+   * Date the game was played on.
+   */
+  this.date = date
   /**
    * Players in the order they finished in, winner first.
    */
-  this.players = players
+  this.results = results
   /**
    * Record who knocked out who, [perp, victim], for distribution of bonus
    * points.
@@ -178,19 +271,28 @@ function Game(players, knockouts) {
    * Lowest-placed player from last game who is playing this game.
    */
   this.fishChipper = null
+  /**
+   * The story of the game, as told by scoring log messages.
+   */
+  this.story = []
 }
 
 Game.prototype.toObject = function() {
   return {
-    players: this.players.map(function(p) { return p.id })
+    date: [this.date.getFullYear(),
+           this.date.getMonth() + 1,
+           this.date.getDate()].join('-')
+  , results: this.results.map(function(p) { return p.id })
   , knockouts: this.knockouts.map(function(ko) { return [ko[0].id, ko[1].id] })
   }
 }
 
 Game.fromObject = function(players, obj) {
+  var dateParts = obj.date.split('-').map(Number)
   return new Game(
-    obj.players.map(function(id) { return players[id] }),
-    obj.knockouts.map(function(ko) { return [players[ko[0]], players[ko[1]]] })
+    new Date(dateParts[0], dateParts[1] - 1, dateParts[2])
+  , obj.results.map(function(id) { return players[id] })
+  , obj.knockouts.map(function(ko) { return [players[ko[0]], players[ko[1]]] })
   )
 }
 
@@ -200,19 +302,19 @@ Game.fromObject = function(players, obj) {
 Game.prototype.setPreviousGameInfo = function(previousGame) {
   // Determine who has a bounty on their head
   this.bountyPlayers = []
-  for (var i = 0, l = previousGame.players.length;
+  for (var i = 0, l = previousGame.results.length;
        i < l && this.bountyPlayers.length < 3;
        i++) {
-    var player = previousGame.players[i]
-    if (this.players.indexOf(player) != -1) {
+    var player = previousGame.results[i]
+    if (this.results.indexOf(player) != -1) {
       this.bountyPlayers.push(player)
     }
   }
 
   // Determine who has the fish-chip
-  for (var i = previousGame.players.length - 1; i >= 0; i--) {
-    var player = previousGame.players[i]
-    if (this.players.indexOf(player) != -1) {
+  for (var i = previousGame.results.length - 1; i >= 0; i--) {
+    var player = previousGame.results[i]
+    if (this.results.indexOf(player) != -1) {
       this.fishChipper = player
       break
     }
@@ -234,25 +336,31 @@ Game.FISH_CHIP_BONUS = 1
  */
 Game.BOUNTY_BONUS = 1
 
+Game.prototype.getGameNumber = function() {
+  return this.index + 1
+}
+
 Game.prototype.getWinner = function() {
-  return this.players[0]
+  return this.results[0]
 }
 
 Game.prototype.getPaidPlayers = function() {
   // Determine how many players should get paid
-  var playerCount = this.players.length
+  var playerCount = this.results.length
   var paid = (playerCount - (playerCount % 3)) / 3
-  return this.players.slice(0, paid)
+  return this.results.slice(0, paid)
 }
 
-Game.prototype.calculateScores = function() {
+Game.prototype.calculateScores = function(scores) {
+  this.story = []
+
   // Adjust points to cope with number of players if necessary
   var points = Game.DEFAULT_POINTS.slice(0)
-  if (this.players.length > points.length) {
-    var extraPoints = this.players.length - points.length
+  if (this.results.length > points.length) {
+    var extraPoints = this.results.length - points.length
     // Add extra points to the defaults
     points = points.map(function(score) { return score + extraPoints})
-    // Add new scores, descending, so the player in last place gets 1 point
+    // Add new points, descending, so the player in last place gets 1 point
     while (extraPoints > 0) {
       points.push(extraPoints)
       extraPoints--
@@ -260,27 +368,26 @@ Game.prototype.calculateScores = function() {
   }
 
   if (this.bountyPlayers !== null) {
-    console.log('Bounties issued for: ' + this.bountyPlayers.join(', ') + '. Dead or alive!')
+    this.log('Bounties issued for: ' + this.bountyPlayers.join(', ') + '.')
   }
   if (this.fishChipper !== null) {
-    console.log(this.fishChipper.name + ' has the fish-chip.')
+    this.log(this.fishChipper.name + ' has the fish-chip.')
   }
-  console.group('Position Scores')
-  console.table([this.players.join(',').split(','), points])
-  console.groupEnd()
-  console.log(this.getWinner() + ' wins!')
-  console.log('In the money: ' + this.getPaidPlayers().join(', '))
 
-  for (var i = 0, l = this.players.length; i < l; i++) {
-    var player = this.players[i]
+  for (var i = 0, l = this.results.length; i < l; i++) {
+    var player = this.results[i]
+      , score = Score.getOrCreate(player, scores)
       , placeScore = points[i]
       , bonusPoints = this.calculateFishChipBonus(player) + this.calculateBountyBonus(player)
     if (i == 0) {
-      player.win()
+      score.win()
     }
-    player.setScore(placeScore + bonusPoints)
-    player.setBonusPoints(bonusPoints)
+    score.setScore(this, placeScore + bonusPoints)
+    score.setBonusPoints(this, bonusPoints)
   }
+
+  this.log(this.getWinner() + ' wins!')
+  this.log('In the money: ' + this.getPaidPlayers().join(', '))
 }
 
 /**
@@ -292,7 +399,7 @@ Game.prototype.calculateFishChipBonus = function(player) {
   if (player === this.fishChipper) {
     var paidPlayers = this.getPaidPlayers()
     if (paidPlayers.indexOf(player) != -1) {
-      console.log(player + ' gets a bonus point for cashing in with the fish-chip!')
+      this.log(player + ' gets a bonus point for cashing in with the fish-chip!')
       fishChipBonus += Game.FISH_CHIP_BONUS
     }
   }
@@ -309,7 +416,7 @@ Game.prototype.calculateBountyBonus = function(player) {
     for (var i = 0, l = this.knockouts.length; i < l; i++) {
       var knockout = this.knockouts[i]
       if (knockout[0] === player && this.bountyPlayers.indexOf(knockout[1]) != -1) {
-        console.log(player + ' calls in the bounty on ' + knockout[1] + '!')
+        this.log(player + ' calls in the bounty on ' + knockout[1] + '!')
         bountyBonus += Game.BOUNTY_BONUS
       }
     }
@@ -317,43 +424,22 @@ Game.prototype.calculateBountyBonus = function(player) {
   return bountyBonus
 }
 
-// ------------------------------------------------------------ Calculations ---
-
-/**
- * Calculates the score each player had in each game.
- */
-function calculateScores(players, games) {
-  var game
-    , previousGame = null
-    , bountyPlayers = null
-    , fishChipper = null
-
-  players.forEach(function(player) { player.resetScores() })
-  for (var i = 0, l = games.length; i < l; i++) {
-    console.group('Game #' + (i + 1))
-    players.forEach(function(player) { player.nextGame() })
-    game = games[i]
-    if (previousGame !== null) {
-      game.setPreviousGameInfo(previousGame)
-    }
-    game.calculateScores()
-    previousGame = game
-    console.groupEnd()
-  }
+Game.prototype.log = function(message) {
+  this.story.push(message)
 }
 
 // ------------------------------------------------------------------- State ---
 
 var players = JSON.parse(localStorage.getItem('players')||'[]').map(Player.fromObject)
 
-var games = JSON.parse(localStorage.getItem('games')||'[]').map(Game.fromObject.bind(null, players))
+var seasons = JSON.parse(localStorage.getItem('seasons')||'[]').map(Season.fromObject.bind(null, players))
 
 function savePlayers() {
   localStorage.setItem('players', JSON.stringify(players.map(function(p) { return p.toObject() })))
 }
 
-function saveGames() {
-  localStorage.setItem('games', JSON.stringify(games.map(function(g) { return g.toObject() })))
+function saveSeasons() {
+  localStorage.setItem('seasons', JSON.stringify(seasons.map(function(s) { return s.toObject() })))
 }
 
 // --------------------------------------------------------------- Templates ---
@@ -407,10 +493,9 @@ DOMBuilder.template.$handler = function(func) {
 var template = DOMBuilder.template
 with (template) {
   $template('league_table'
-  , H1('League Table')
   , TABLE({'class': 'table table-striped table-bordered table-condensed'}
     , THEAD(TR(
-        TH('Name')
+        TH('Player')
       , TH('Games Played')
       , TH('Wins')
       , TH('Average Points Per Game')
@@ -418,18 +503,41 @@ with (template) {
       , TH('Lowest Weekly Points')
       , TH('Overall Points')
       ))
-    , TBODY($for('player in players'
+    , TBODY($for('score in scores'
       , TR(
-          TD(A({href: '#', click: $handler(displayPlayer, $var('player'))}, '{{player.name }}'))
-        , TD('{{ player.getGamesPlayed }}')
-        , TD('{{ player.wins }}')
-        , TD('{{ player.getAveragePointsPerGame }}')
-        , TD('{{ player.getBonusPoints }}')
-        , TD('{{ player.getLowestWeeklyPoints }}')
-        , TD('{{ player.getOverallScore }}')
+          TD(
+            A({href: '#', click: $handler(displayPlayer, $var('score.player'))}
+            , '{{ score.player.name }}'
+            )
+          )
+        , TD('{{ score.getGamesPlayed }}')
+        , TD('{{ score.wins }}')
+        , TD('{{ score.getAveragePointsPerGame }}')
+        , TD('{{ score.getBonusPoints }}')
+        , TD('{{ score.getLowestWeeklyPoints }}')
+        , TD('{{ score.getOverallScore }}')
         )
       ))
     )
+  )
+
+  $template('index'
+  , $if('season'
+    , H1(
+        A({href: '#', click: $handler(displaySeason, $var('season'))}, '{{ season.name }}')
+      , ' League Table'
+      )
+    , $include('league_table', {scores: $var('season.scores')})
+    , $else(
+        P('There are no Seasons set up yet.')
+      )
+    )
+  )
+
+  $template('player_list'
+  , UL($for('player in players'
+    , LI(A({href: '#', click: $handler(displayPlayer, $var('player'))}, '{{ player.name }}'))
+    ))
   , FORM({id: 'addPlayerForm', 'class': 'form-horizontal', submit: $handler(addPlayer)}
     , FIELDSET(
         LEGEND('Add Player')
@@ -446,27 +554,75 @@ with (template) {
     )
   )
 
+  // TODO
   $template('player_details'
-  , H1('{{ player.name }}')
+  , H1('Player: {{ player.name }}')
   )
 
-  $template('game_list'
-  , H1('Games')
+  $template('season_list'
   , TABLE({'class': 'table table-striped table-bordered table-condensed'}
     , THEAD(TR(
-        TH('#')
-      , TH('Winner')
+        TH('Name')
+      , TH('# Games Played')
       ))
-    , TBODY($for('game in games'
+    , TBODY($for('season in seasons'
       , TR(
-          TD(A({href: '#', click: $handler(displayGame, $var('game'))}, 'Game #{{ forloop.counter }}'))
-        , TD('{{ game.getWinner.name }}')
+          TD(
+            A({href: '#', click: $handler(displaySeason, $var('season'))}
+            , '{{ season.name }}'
+            )
+          )
+        , TD('{{ season.games.length }}')
         )
       ))
     )
-  , FORM({id: 'addGameForm', 'class': 'form-horizontal', submit: $handler(addGame)}
+  , FORM({id: 'addSeasonForm', 'class': 'form-horizontal', submit: $handler(addSeason)}
+    , FIELDSET(
+        LEGEND('Add Season')
+      , DIV({'class': 'control-group'}
+        , LABEL({'class': 'control-label', 'for': 'name'}, 'Name')
+        , DIV({'class': 'controls'}
+          , INPUT({'class:': 'input-large', type: 'text', name: 'name', id: 'name'})
+          )
+        )
+      , DIV({'class': 'form-actions'}
+        , BUTTON({'class': 'btn btn-primary', type: 'submit'}, 'Add Season')
+        )
+      )
+    )
+  )
+
+  $template('season_details'
+  , H1('Season: {{ season.name }}')
+  , H2('League Table')
+  , $include('league_table', {scores: $var('season.scores')})
+  , H2('Games')
+  , TABLE({'class': 'table table-striped table-bordered table-condensed'}
+    , THEAD(TR(
+        TH()
+      , TH('Players')
+      , TH('Played On')
+      , TH('Winner')
+      ))
+    , TBODY($for('game in season.games'
+      , TR(
+          TD(A({href: '#', click: $handler(displayGame, $var('game'))}, 'Game {{ game.getGameNumber }}'))
+        , TD('{{ game.results.length }}')
+        , TD('{{ game.date.toDateString }}')
+        , TD(A({href: '#', click: $handler(displayPlayer, $var('game.getWinner'))}, '{{ game.getWinner.name }}'))
+        )
+      ))
+    )
+  , FORM({id: 'addGameForm', 'class': 'form-horizontal', submit: $handler(addGame, $var('season'))}
     , FIELDSET(
         LEGEND('Add Game')
+      , DIV({'class': 'control-group'}
+        , LABEL({'class': 'control-label', 'for': 'date'}, 'Date')
+        , DIV({'class': 'controls'}
+          , INPUT({type: 'text', name: 'date', id: 'date'})
+          , SPAN({'class': 'help-inline'}, 'DD/MM/YYYY')
+          )
+        )
       , DIV({'class': 'control-group'}
         , LABEL({'class': 'control-label'}, 'Results')
         , DIV({'class': 'controls'}
@@ -521,8 +677,17 @@ with (template) {
     )
   )
 
+  // TODO
   $template('game_details'
-  , H1('Game #{{ gameNumber }}')
+  , H1(
+      'Game #{{ game.getGameNumber }} in '
+    , A({href: '#', click: $handler(displaySeason, $var('game.season'))}, '{{ game.season.name }}')
+    , ', played on {{ game.date.toDateString }}'
+    )
+  , H2('Story of the Game')
+  , $for('line in game.story'
+    , P('{{ line }}')
+    )
   )
 }
 
@@ -539,24 +704,27 @@ function displayContent(templateName, contextVariables) {
   el.appendChild(template.renderTemplate(templateName, contextVariables))
 }
 
-function leagueTable(e) {
+function index(e) {
   if (e) stop(e)
-  displayContent('league_table', {
-    players: players.slice(0)
-                    .sort(function(a, b) {
-                      return b.getOverallScore() - a.getOverallScore()
-                    })
+  displayContent('index', {
+    season: seasons.length ? seasons[seasons.length - 1] : null
+  })
+}
+
+function playersList(e) {
+  if (e) stop(e)
+  displayContent('player_list', {
+    players: players
   })
 }
 
 function addPlayer(e) {
   if (e) stop(e)
   var form = document.getElementById('addPlayerForm')
-  if (!form.elements.name.value) return alert('Name is required to add a new player.')
+  if (!form.elements.name.value) return alert('Name is required to add a new Player.')
   players.push(new Player(players.length, form.elements.name.value))
   savePlayers()
-  calculateScores(players, games)
-  leagueTable()
+  playersList()
 }
 
 function displayPlayer(player, e) {
@@ -566,17 +734,36 @@ function displayPlayer(player, e) {
   })
 }
 
-function gamesList(e) {
+function seasonsList(e) {
   if (e) stop(e)
-  displayContent('game_list', {
-    games: games
+  displayContent('season_list', {
+    seasons: seasons
+  })
+}
+
+function addSeason(e) {
+  if (e) stop(e)
+  var form = document.getElementById('addSeasonForm')
+  if (!form.elements.name.value) return alert('Name is required to add a new Season.')
+  var season = new Season(form.elements.name.value)
+  seasons.push(season)
+  saveSeasons()
+  displaySeason(season)
+}
+
+function displaySeason(season, e) {
+  if (e) stop(e)
+  displayContent('season_details', {
+    season: season
   , players: players
   })
 }
 
-function addGame(e) {
+function addGame(season, e) {
   if (e) stop(e)
   var form = document.getElementById('addGameForm')
+  var dateParts = form.elements.date.value.split('/').map(Number)
+    , date = new Date(dateParts[2], dateParts[1] - 1, dateParts[0])
   // Assign players to a positions array, winner first
   var playerPositions = []
   Array.prototype.forEach.call(form.elements.position, function(el, playerIndex) {
@@ -603,25 +790,23 @@ function addGame(e) {
       ])
     }
   }
-
-  games.push(new Game(playerPositions, knockouts))
-  saveGames()
-  calculateScores(players, games)
-  gamesList()
+  // Add the game to its season
+  season.addGame(new Game(date, playerPositions, knockouts))
+  saveSeasons()
+  displaySeason(season)
 }
 
 function displayGame(game, e) {
   if (e) stop(e)
   displayContent('game_details', {
     game: game
-  , gameNumber: games.indexOf(game) + 1
   })
 }
 
 // -------------------------------------------------------------------- Boot ---
 
-document.getElementById('navLeague').onclick = leagueTable
-document.getElementById('navGames').onclick = gamesList
+document.getElementById('navIndex').onclick = index
+document.getElementById('navSeasons').onclick = seasonsList
+document.getElementById('navPlayers').onclick = playersList
 
-calculateScores(players, games)
-leagueTable()
+index()
