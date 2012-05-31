@@ -535,6 +535,7 @@ with (template) {
   )
 
   $template('player_list'
+  , H1('Players')
   , UL($for('player in players'
     , LI(A({href: '#', click: $handler(displayPlayer, $var('player'))}, '{{ player.name }}'))
     ))
@@ -560,6 +561,7 @@ with (template) {
   )
 
   $template('season_list'
+  , H1('Seasons')
   , TABLE({'class': 'table table-striped table-bordered table-condensed'}
     , THEAD(TR(
         TH('Name')
@@ -677,10 +679,9 @@ with (template) {
     )
   )
 
-  // TODO
   $template('game_details'
   , H1(
-      'Game #{{ game.getGameNumber }} in '
+      'Game {{ game.getGameNumber }} in '
     , A({href: '#', click: $handler(displaySeason, $var('game.season'))}, '{{ game.season.name }}')
     , ', played on {{ game.date.toDateString }}'
     )
