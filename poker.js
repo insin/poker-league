@@ -1,45 +1,4 @@
-/*
-spreadsheet for my poker league.
-
-We have a scoring system that works thusly:
-1st = 15pts
-2nd = 13pts
-3rd = 11pts
-4th = 9 points
-5th = 7 points
-6th = 5points
-7th = 4 points
-8th = 3 points
-9th = 2 points
-10th = 1 point.
-
-If there are more than 10 players, each place gets 1 additional point per
-player, so the last place finisher always receives 1 point - so with 13 players,
-last place gets 1 point and first place gets 18 points.
-
-We also have bonus points. You get 1 point if you knock out a top-three player
-from the previous week. So if David won last week and I take all his chips, I
-receive a bonus point.
-
-It gets a little complicated in that these bounty chips move along to the next
-player in the case of non-attendees, so if David won last week but doesn't turn
-up this week, the players who finished 2nd, 3rd and 4th have this bounty on
-their head.
-
-The other bonus point is given if you finished in last place the previous week.
-You handed a 'fish-chip' and if you finish in the money this week, you get a
-bonus point. The money places change dependant on the amount of players; if
-there's 6 players only the top two get paid, if there's 13 it's top four.
-
-We have 12 weeks a season and only your top 9 scores count. So if you play 12
-weeks your worst three scores are removed from your total.
-
-I'd love the League table to have
-  Games Played, Wins, Average Points Per Game, Bounty Points,
-  Current Individual Lowest Weekly Points and Overall points.
-*/
-
-// ------------------------------------------------------------------- Utils ---
+// =================================================================== Utils ===
 
 if (!Array.prototype.sum) {
   Object.defineProperty(Array.prototype, 'sum', {
@@ -48,6 +7,8 @@ if (!Array.prototype.sum) {
     }
   })
 }
+
+// ================================================================ Entities ===
 
 // ------------------------------------------------------------------ Player ---
 
@@ -202,10 +163,10 @@ Season.prototype.toObject = function() {
   }
 }
 
-Season.fromObject = function(players, obj) {
+Season.fromObject = function(obj) {
   var season = new Season(obj.name)
   obj.games.forEach(function(gameObj) {
-    season.addGame(Game.fromObject(players, gameObj), false)
+    season.addGame(Game.fromObject(gameObj), false)
   })
   season.sortScores
   return season
@@ -287,12 +248,14 @@ Game.prototype.toObject = function() {
   }
 }
 
-Game.fromObject = function(players, obj) {
+Game.fromObject = function(obj) {
   var dateParts = obj.date.split('-').map(Number)
   return new Game(
     new Date(dateParts[0], dateParts[1] - 1, dateParts[2])
-  , obj.results.map(function(id) { return players[id] })
-  , obj.knockouts.map(function(ko) { return [players[ko[0]], players[ko[1]]] })
+  , obj.results.map(function(id) { return Players.get(id) })
+  , obj.knockouts.map(function(ko) {
+      return [Players.get(ko[0]), Players.get(ko[1])]
+    })
   )
 }
 
@@ -386,6 +349,11 @@ Game.prototype.calculateScores = function(scores) {
     score.setBonusPoints(this, bonusPoints)
   }
 
+  for (var i = 0, l = this.knockouts.length; i < l; i++) {
+    var ko = this.knockouts[i]
+    this.log(ko[0].name + ' knocked out ' + ko[1].name)
+  }
+
   this.log(this.getWinner() + ' wins!')
   this.log('In the money: ' + this.getPaidPlayers().join(', '))
 }
@@ -428,19 +396,105 @@ Game.prototype.log = function(message) {
   this.story.push(message)
 }
 
-// ------------------------------------------------------------------- State ---
+// ----------------------------------------------------------------- Storage ---
 
-var players = JSON.parse(localStorage.getItem('players')||'[]').map(Player.fromObject)
+/**
+ * Wrapper around localStorage which stores instances in an array, using its
+ * indices as ids.
+ */
+var LocalStorage = Concur.extend({
+  constructor: function(entity, storageKey) {
+    if (typeof entity.fromObject != 'function') {
+      throw new Error(storageKey + ': LocalStorage entities must define a static fromObject() function.')
+    }
+    if (typeof entity.prototype.toObject != 'function') {
+      throw new Error(storageKey + ': LocalStorage entities must define a toObject() instance method.')
+    }
+    this._entity = entity
+    this._storageKey = storageKey
+    /**
+     * Working copy of stored data, null indicates that it hasn't been
+     * initialised from localStorage yet.
+     */
+    this._store = null
+  }
 
-var seasons = JSON.parse(localStorage.getItem('seasons')||'[]').map(Season.fromObject.bind(null, players))
+  /**
+   * Loads JSON from localStorage and uses the entity's fromObject() to
+   * initialise the storage array.
+   */
+, _load: function() {
+    var json = localStorage.getItem(this._storageKey)
+    // If this is the first load, there won't be any data
+    this._store = json ? JSON.parse(json).map(this._entity.fromObject) : []
+  }
 
-function savePlayers() {
-  localStorage.setItem('players', JSON.stringify(players.map(function(p) { return p.toObject() })))
-}
+  /**
+   * Saves the current working copy to localStorage using the entity's
+   * toObject() method to create plain data representations to be stringified.
+   */
+, _save: function() {
+    var json = JSON.stringify(this._store.map(
+      function(instance) { return instance.toObject() }
+    ))
+    localStorage.setItem(this._storageKey, json)
+  }
 
-function saveSeasons() {
-  localStorage.setItem('seasons', JSON.stringify(seasons.map(function(s) { return s.toObject() })))
-}
+  /**
+   * Gets the storage array for the entity, initialising it first if necessary.
+   */
+, _getStore: function() {
+    if (this._store === null) {
+      this._load()
+    }
+    return this._store
+  }
+
+  /**
+   * Gets all instances of the entity - altering the array won't affect the
+   * working copy, but altering an instance will.
+   */
+, all: function() {
+    return this._getStore().slice(0)
+  }
+
+  /**
+   * Gets the instances with the given id.
+   */
+, get: function(id) {
+    return this._getStore()[id]
+  }
+
+  /**
+   * Determines the next available id (working copy array index).
+   */
+, nextId: function() {
+    return this._getStore().length
+  }
+
+  /**
+   * Generates an id for the given instance and stores it.
+   */
+, add: function(instance) {
+    instance.id = this.nextId()
+    this._getStore().push(instance)
+    this._save()
+    return instance
+  }
+
+  /**
+   * Saves an existing instance - in practice this means writing the job lot to
+   * localStorage, but that's just this crappy implmentation.
+   */
+, save: function(instance) {
+    this._save()
+  }
+})
+
+var Players = new LocalStorage(Player, 'players')
+var Seasons = new LocalStorage(Season, 'seasons')
+
+// ====================================================================== UI ===
 
 // --------------------------------------------------------------- Templates ---
 
@@ -692,7 +746,7 @@ with (template) {
   )
 }
 
-// ------------------------------------------------------- Make Stuff Happen ---
+// ------------------------------------------------------------------- Views ---
 
 function stop(e) {
   e.preventDefault()
@@ -708,14 +762,14 @@ function displayContent(templateName, contextVariables) {
 function index(e) {
   if (e) stop(e)
   displayContent('index', {
-    season: seasons.length ? seasons[seasons.length - 1] : null
+    season: Seasons.all().pop()
   })
 }
 
 function playersList(e) {
   if (e) stop(e)
   displayContent('player_list', {
-    players: players
+    players: Players.all()
   })
 }
 
@@ -723,8 +777,7 @@ function addPlayer(e) {
   if (e) stop(e)
   var form = document.getElementById('addPlayerForm')
   if (!form.elements.name.value) return alert('Name is required to add a new Player.')
-  players.push(new Player(players.length, form.elements.name.value))
-  savePlayers()
+  var player = Players.add(new Player(players.length, form.elements.name.value))
   playersList()
 }
 
@@ -738,7 +791,7 @@ function displayPlayer(player, e) {
 function seasonsList(e) {
   if (e) stop(e)
   displayContent('season_list', {
-    seasons: seasons
+    seasons: Seasons.all()
   })
 }
 
@@ -746,9 +799,7 @@ function addSeason(e) {
   if (e) stop(e)
   var form = document.getElementById('addSeasonForm')
   if (!form.elements.name.value) return alert('Name is required to add a new Season.')
-  var season = new Season(form.elements.name.value)
-  seasons.push(season)
-  saveSeasons()
+  var season = Seasons.add(new Season(form.elements.name.value))
   displaySeason(season)
 }
 
@@ -756,7 +807,7 @@ function displaySeason(season, e) {
   if (e) stop(e)
   displayContent('season_details', {
     season: season
-  , players: players
+  , players: Players.all()
   })
 }
 
@@ -770,7 +821,7 @@ function addGame(season, e) {
   Array.prototype.forEach.call(form.elements.position, function(el, playerIndex) {
     if (el.value != '') {
       var position = parseInt(el.value, 10)
-      playerPositions[position - 1] = players[playerIndex]
+      playerPositions[position - 1] = Players.get(playerIndex)
     }
   })
   // Set up record of important knockouts
@@ -786,14 +837,14 @@ function addGame(season, e) {
       , victim = victims[i].value
     if (perp != '' && victim != '' && perp != victim) {
       knockouts.push([
-        players[parseInt(perp, 10)]
-      , players[parseInt(victim, 10)]
+        Players.get(parseInt(perp, 10))
+      , Players.get(parseInt(victim, 10))
       ])
     }
   }
   // Add the game to its season
   season.addGame(new Game(date, playerPositions, knockouts))
-  saveSeasons()
+  Seasons.save(season)
   displaySeason(season)
 }
 
@@ -804,7 +855,7 @@ function displayGame(game, e) {
   })
 }
 
-// -------------------------------------------------------------------- Boot ---
+// ==================================================================== Init ===
 
 document.getElementById('navIndex').onclick = index
 document.getElementById('navSeasons').onclick = seasonsList
