@@ -675,10 +675,10 @@ with (template) {
       , DIV({'class': 'control-group'}
         , LABEL({'class': 'control-label'}, 'Results')
         , DIV({'class': 'controls'}
-          , TABLE({'class': 'table table-condensed', style: 'width: auto'}
+          , TABLE({'class': 'table table-condensed table-controls', style: 'width: auto'}
             , THEAD(TR(
                 TH({style: 'width: 100px'}, 'Player')
-              , TH({style: 'width: 300px'}, 'Position')
+              , TH({style: 'width: 350px'}, 'Position')
               ))
             , TBODY($for('player in players'
               , TR(
@@ -690,6 +690,7 @@ with (template) {
                 )
               ))
             )
+          , P({'class': 'help-block hide', id: 'results-help'})
           )
         )
       , DIV({'class': 'control-group'}
@@ -832,7 +833,7 @@ function addGame(season, e) {
       contentGroup.classList.remove('success')
       contentGroup.classList.add('error')
       help.classList.remove('hide')
-      help.textContent = 'Please enter a valid date in DD/MM/YYYY format.'
+      help.textContent = 'Enter a valid date in DD/MM/YYYY format.'
       valid = false
     }
     return date
@@ -842,21 +843,38 @@ function addGame(season, e) {
   var playerPositions = (function() {
     var playerPositionsValid = true
       , els = Array.prototype.slice.call(form.elements.position)
+      , help = document.getElementById('results-help')
+
+    // All blank is invalid
+    if (els.filter(function(el) { return el.value != '' }).length == 0) {
+      help.parentNode.parentNode.classList.add('error')
+      help.classList.remove('hide')
+      help.textContent = 'Enter the position each player who played finished in.'
+      playerPositionsValid = valid = false
+    }
+    else {
+      help.parentNode.parentNode.classList.remove('error')
+      help.classList.add('hide')
+      help.textContent = ''
+    }
 
     // Check that position inputs are valid
     els.forEach(function(el) {
       // Blank or numeric is valid
       if (el.value != '' && !/^\d\d?$/.test(el.value)) {
+        el.parentNode.parentNode.classList.add('error')
         el.nextSibling.classList.remove('hide')
         el.nextSibling.textContent = 'Invalid position'
         playerPositionsValid = valid = false
       }
       else {
+        el.parentNode.parentNode.classList.remove('error')
         el.nextSibling.classList.add('hide')
         el.nextSibling.textContent = ''
       }
     })
-    if (!playerPositionsValid) return null
+
+    if (!playerPositionsValid) return
 
     // If we're still good, check for gaps
     var expected = 1
@@ -872,17 +890,20 @@ function addGame(season, e) {
       // Stop checking after the first invalid position, but keep looping to
       // clear any previous validation errors which may have been displayed.
       if (playerPositionsValid && position != expected) {
+        el.parentNode.parentNode.classList.add('error')
         el.nextSibling.classList.remove('hide')
         el.nextSibling.textContent = 'Expected position ' + expected + ' to be assigned first'
         playerPositionsValid = valid = false
       }
       else {
+        el.parentNode.parentNode.classList.remove('error')
         el.nextSibling.classList.add('hide')
         el.nextSibling.textContent = ''
       }
       expected++
     }
-    if (!playerPositionsValid) return null
+
+    if (!playerPositionsValid) return
 
     // Input looks good, so create player positions
     var playerPositions = []
@@ -892,10 +913,7 @@ function addGame(season, e) {
         playerPositions[position - 1] = Players.get(index)
       }
     })
-    if (!playerPositions.length) {
-      // TODO Display block error
-      valid = false
-    }
+
     return playerPositions
   })()
 
