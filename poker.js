@@ -500,44 +500,30 @@ var Seasons = new LocalStorage(Season, 'seasons')
 
 // ====================================================================== UI ===
 
-// --------------------------------------------------------------- Templates ---
+// ---------------------------------------------------- Custom TemplateNodes ---
 
 var templateAPI = DOMBuilder.modes.template.api
 
+/**
+ * Provides an event-handling function and optionally partially applies
+ * arguments to it. The function can be provided directly or as a template
+ * variable and any arguments are expected to come from template variables.
+ */
 var EventHandlerNode = templateAPI.TemplateNode.extend({
   constructor: function(func, args) {
     args = args || []
-    this.func = func
-    this.args = []
-    for (var i = 0, l = args.length; i < l; i++) {
-      if (args[i] instanceof templateAPI.Variable) {
-        this.args.push(args[i])
-      }
-      else {
-        this.args.push(new templateAPI.TextNode(args[i]))
-      }
-    }
+    this.func = (typeof func == 'function' ? func : new templateAPI.Variable(func))
+    this.args = args.map(function(arg) {
+      return (arg instanceof templateAPI.Variable ? arg : new templateAPI.Variable(arg))
+    })
   }
 
-  /**
-   * Looks up arguments values from the template context and returns a function
-   * which will call the handler with the configured arguments and any arguments
-   * passed to the event handling function.
-   */
 , render: function(context) {
-    var func = this.func, args = []
-    for (var i = 0, l = this.args.length; i < l; i++) {
-      if (this.args[i] instanceof templateAPI.Variable) {
-        args.push(this.args[i].resolve(context))
-      }
-      else {
-        args.push(this.args[i].render(context).join(''))
-      }
-
-    }
+    var func = (typeof this.func == 'function' ? this.func : this.func.resolve(context))
+      , args = this.args.map(function(arg) { return arg.resolve(context) })
     return function() {
-      this.func.apply(this, args.concat(Array.prototype.slice.call(arguments, 0)))
-    }.bind(this)
+      func.apply(this, args.concat(Array.prototype.slice.call(arguments, 0)))
+    }
   }
 })
 
@@ -547,6 +533,8 @@ var EventHandlerNode = templateAPI.TemplateNode.extend({
 DOMBuilder.template.$handler = function(func) {
   return new EventHandlerNode(func, Array.prototype.slice.call(arguments, 1))
 }
+
+// --------------------------------------------------------------- Templates ---
 
 var template = DOMBuilder.template
 with (template) {
@@ -564,7 +552,7 @@ with (template) {
     , TBODY($for('score in scores'
       , TR(
           TD(
-            A({href: '#', click: $handler(displayPlayer, $var('score.player'))}
+            A({href: '#', click: $handler(displayPlayer, 'score.player')}
             , '{{ score.player.name }}'
             )
           )
@@ -582,7 +570,7 @@ with (template) {
   $template('index'
   , $if('season'
     , H1(
-        A({href: '#', click: $handler(displaySeason, $var('season'))}, '{{ season.name }}')
+        A({href: '#', click: $handler(displaySeason, 'season')}, '{{ season.name }}')
       , ' League Table'
       )
     , $include('league_table', {scores: $var('season.scores')})
@@ -595,9 +583,9 @@ with (template) {
   $template('player_list'
   , H1('Players')
   , UL($for('player in players'
-    , LI(A({href: '#', click: $handler(displayPlayer, $var('player'))}, '{{ player.name }}'))
+    , LI(A({href: '#', click: $handler(displayPlayer, 'player')}, '{{ player.name }}'))
     ))
-  , FORM({id: 'addPlayerForm', 'class': 'form-horizontal', submit: $handler(addPlayer)}
+  , FORM({id: 'addPlayerForm', 'class': 'form-horizontal', submit: addPlayer}
     , FIELDSET(
         LEGEND('Add Player')
       , DIV({'class': 'control-group'}
@@ -628,7 +616,7 @@ with (template) {
     , TBODY($for('season in seasons'
       , TR(
           TD(
-            A({href: '#', click: $handler(displaySeason, $var('season'))}
+            A({href: '#', click: $handler(displaySeason, 'season')}
             , '{{ season.name }}'
             )
           )
@@ -636,7 +624,7 @@ with (template) {
         )
       ))
     )
-  , FORM({id: 'addSeasonForm', 'class': 'form-horizontal', submit: $handler(addSeason)}
+  , FORM({id: 'addSeasonForm', 'class': 'form-horizontal', submit: addSeason}
     , FIELDSET(
         LEGEND('Add Season')
       , DIV({'class': 'control-group'}
@@ -666,14 +654,14 @@ with (template) {
       ))
     , TBODY($for('game in season.games'
       , TR(
-          TD(A({href: '#', click: $handler(displayGame, $var('game'))}, 'Game {{ game.getGameNumber }}'))
+          TD(A({href: '#', click: $handler(displayGame, 'game')}, 'Game {{ game.getGameNumber }}'))
         , TD('{{ game.results.length }}')
         , TD('{{ game.date.toDateString }}')
-        , TD(A({href: '#', click: $handler(displayPlayer, $var('game.getWinner'))}, '{{ game.getWinner.name }}'))
+        , TD(A({href: '#', click: $handler(displayPlayer, 'game.getWinner')}, '{{ game.getWinner.name }}'))
         )
       ))
     )
-  , FORM({id: 'addGameForm', 'class': 'form-horizontal', submit: $handler(addGame, $var('season'))}
+  , FORM({id: 'addGameForm', 'class': 'form-horizontal', submit: $handler(addGame, 'season')}
     , FIELDSET(
         LEGEND('Add Game')
       , DIV({'class': 'control-group'}
@@ -740,7 +728,7 @@ with (template) {
   $template('game_details'
   , H1(
       'Game {{ game.getGameNumber }} in '
-    , A({href: '#', click: $handler(displaySeason, $var('game.season'))}, '{{ game.season.name }}')
+    , A({href: '#', click: $handler(displaySeason, 'game.season')}, '{{ game.season.name }}')
     , ', played on {{ game.date.toDateString }}'
     )
   , H2('Story of the Game')
