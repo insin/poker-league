@@ -344,6 +344,10 @@ Game.prototype.calculateScores = function(scores) {
       , bonusPoints = this.calculateFishChipBonus(player) + this.calculateBountyBonus(player)
     if (i == 0) {
       score.win()
+      if (this.bountyPlayers !== null && this.bountyPlayers.indexOf(player) != -1) {
+        this.log(player + ' escaped with his own bounty!')
+        bonusPoints++
+      }
     }
     score.setScore(this, placeScore + bonusPoints)
     score.setBonusPoints(this, bonusPoints)
@@ -384,7 +388,7 @@ Game.prototype.calculateBountyBonus = function(player) {
     for (var i = 0, l = this.knockouts.length; i < l; i++) {
       var knockout = this.knockouts[i]
       if (knockout[0] === player && this.bountyPlayers.indexOf(knockout[1]) != -1) {
-        this.log(player + ' calls in the bounty on ' + knockout[1] + '!')
+        this.log(player + ' cashes in the bounty on ' + knockout[1] + '!')
         bountyBonus += Game.BOUNTY_BONUS
       }
     }
