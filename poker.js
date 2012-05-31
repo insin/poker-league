@@ -691,8 +691,8 @@ with (template) {
       , DIV({'class': 'control-group'}
         , LABEL({'class': 'control-label'}, 'Knockouts')
         , DIV({'class': 'controls'}
-          , DIV(
-              SELECT({'name': 'perp'}
+          , DIV({style: 'margin-bottom: 9px'}
+            , SELECT({'name': 'perp'}
               , OPTION({value: ''}, '----')
               , $for('player in players'
                 , OPTION({value: '{{ player.id }}'}, '{{ player.name }}')
@@ -706,16 +706,18 @@ with (template) {
                 )
               )
             )
-          , BUTTON({'class': 'btn btn-success', type: 'button', click: function(e) {
-              var ko = this.parentNode.firstChild.cloneNode(true)
+          , P(BUTTON({'class': 'btn btn-success', type: 'button', click: function(e) {
+              var ko = this.parentNode.parentNode.firstChild.cloneNode(true)
               var el = DOMBuilder.dom
               ko.appendChild(
-                 el.BUTTON({'class': 'btn btn-danger', type: 'button', click: function(e) {
-                  this.parentNode.parentNode.removeChild(this.parentNode)
-                 }}, el.I({'class': 'icon-minus'}))
+                el.SPAN({'class': 'help-inline'}
+                , el.BUTTON({'class': 'btn btn-danger', type: 'button', click: function(e) {
+                    this.parentNode.parentNode.parentNode.removeChild(this.parentNode.parentNode)
+                  }}, el.I({'class': 'icon-minus'}))
+                )
               )
               this.parentNode.insertBefore(ko, this)
-            }}, I({'class': 'icon-plus'}))
+            }}, I({'class': 'icon-plus'})))
           )
         )
       , DIV({'class': 'form-actions'}
