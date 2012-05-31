@@ -1,3 +1,6 @@
+var STORAGE_DATE_FORMAT = '%Y-%m-%d'
+  , INPUT_DATE_FORMAT = '%d/%m/%Y'
+
 // =================================================================== Utils ===
 
 if (!Array.prototype.sum) {
@@ -240,9 +243,7 @@ function Game(date, results, knockouts) {
 
 Game.prototype.toObject = function() {
   return {
-    date: [this.date.getFullYear(),
-           this.date.getMonth() + 1,
-           this.date.getDate()].join('-')
+    date: isomorph.time.strftime(this.date, STORAGE_DATE_FORMAT)
   , results: this.results.map(function(p) { return p.id })
   , knockouts: this.knockouts.map(function(ko) { return [ko[0].id, ko[1].id] })
   }
@@ -251,7 +252,7 @@ Game.prototype.toObject = function() {
 Game.fromObject = function(obj) {
   var dateParts = obj.date.split('-').map(Number)
   return new Game(
-    new Date(dateParts[0], dateParts[1] - 1, dateParts[2])
+    isomorph.time.strpdate(obj.date, STORAGE_DATE_FORMAT)
   , obj.results.map(function(id) { return Players.get(id) })
   , obj.knockouts.map(function(ko) {
       return [Players.get(ko[0]), Players.get(ko[1])]
@@ -667,22 +668,25 @@ with (template) {
       , DIV({'class': 'control-group'}
         , LABEL({'class': 'control-label', 'for': 'date'}, 'Date')
         , DIV({'class': 'controls'}
-          , INPUT({type: 'text', name: 'date', id: 'date'})
-          , SPAN({'class': 'help-inline'}, 'DD/MM/YYYY')
+          , INPUT({type: 'text', name: 'date', id: 'date', placeholder: 'DD/MM/YYYY'})
+          , P({'class': 'help-block hide'})
           )
         )
       , DIV({'class': 'control-group'}
         , LABEL({'class': 'control-label'}, 'Results')
         , DIV({'class': 'controls'}
-          , TABLE({'class': 'table table-condensed'}
+          , TABLE({'class': 'table table-condensed', style: 'width: auto'}
             , THEAD(TR(
-                TH('Player')
-              , TH('Position')
+                TH({style: 'width: 100px'}, 'Player')
+              , TH({style: 'width: 300px'}, 'Position')
               ))
             , TBODY($for('player in players'
               , TR(
-                  TD('{{ player.name }}')
-                , TD(INPUT({type: 'text', name: 'position', 'class': 'input-mini'}))
+                  TD(LABEL({'for': 'position{{ forloop.counter0 }}'}, '{{ player.name }}'))
+                , TD(
+                    INPUT({type: 'text', name: 'position', id: 'position{{ forloop.counter0 }}', 'class': 'input-mini'})
+                  , SPAN({'class': 'help-inline hide'})
+                  )
                 )
               ))
             )
@@ -721,7 +725,8 @@ with (template) {
           )
         )
       , DIV({'class': 'form-actions'}
-        , BUTTON({'class': 'btn btn-primary', type: 'submit'}, 'Add Game')
+        , BUTTON({'class': 'btn btn-primary', type: 'submit', name: 'submitBtn'}, 'Add Game')
+        , SPAN({'class': 'help-inline hide'})
         )
       )
     )
@@ -808,34 +813,138 @@ function displaySeason(season, e) {
 function addGame(season, e) {
   if (e) stop(e)
   var form = document.getElementById('addGameForm')
-  var dateParts = form.elements.date.value.split('/').map(Number)
-    , date = new Date(dateParts[2], dateParts[1] - 1, dateParts[0])
-  // Assign players to a positions array, winner first
-  var playerPositions = []
-  Array.prototype.forEach.call(form.elements.position, function(el, playerIndex) {
-    if (el.value != '') {
-      var position = parseInt(el.value, 10)
-      playerPositions[position - 1] = Players.get(playerIndex)
+    , valid = true
+
+  // Game date input and validation
+  var date = (function() {
+    var date = null
+      , el = form.elements.date
+      , contentGroup = el.parentNode.parentNode
+      , help = el.nextSibling
+    try {
+      date = isomorph.time.strpdate(form.elements.date.value, INPUT_DATE_FORMAT)
+      contentGroup.classList.remove('error')
+      contentGroup.classList.add('success')
+      help.classList.add('hide')
+      help.textContent = ''
     }
-  })
-  // Set up record of important knockouts
-  var knockouts = []
-    , perps = form.elements.perp
-    , victims = form.elements.victim
-  if (typeof perps.length == 'undefined') {
-    perps = [perps]
-    victims = [victims]
-  }
-  for (var i = 0, l = perps.length; i < l; i++) {
-    var perp = perps[i].value
-      , victim = victims[i].value
-    if (perp != '' && victim != '' && perp != victim) {
-      knockouts.push([
-        Players.get(parseInt(perp, 10))
-      , Players.get(parseInt(victim, 10))
-      ])
+    catch (e) {
+      contentGroup.classList.remove('success')
+      contentGroup.classList.add('error')
+      help.classList.remove('hide')
+      help.textContent = 'Please enter a valid date in DD/MM/YYYY format.'
+      valid = false
     }
+    return date
+  })()
+
+  // Player position result input and validation
+  var playerPositions = (function() {
+    var playerPositionsValid = true
+      , els = Array.prototype.slice.call(form.elements.position)
+
+    // Check that position inputs are valid
+    els.forEach(function(el) {
+      // Blank or numeric is valid
+      if (el.value != '' && !/^\d\d?$/.test(el.value)) {
+        el.nextSibling.classList.remove('hide')
+        el.nextSibling.textContent = 'Invalid position'
+        playerPositionsValid = valid = false
+      }
+      else {
+        el.nextSibling.classList.add('hide')
+        el.nextSibling.textContent = ''
+      }
+    })
+    if (!playerPositionsValid) return null
+
+    // If we're still good, check for gaps
+    var expected = 1
+      , sortedEls =
+            els.slice()
+               .filter(function(el) { return el.value != '' })
+               .sort(function(a, b) {
+                  return parseInt(a.value, 10) - parseInt(b.value, 10)
+                })
+    for (var i = 0, l = sortedEls.length ; i < l; i++) {
+      var el = sortedEls[i]
+        , position = parseInt(el.value, 10)
+      // Stop checking after the first invalid position, but keep looping to
+      // clear any previous validation errors which may have been displayed.
+      if (playerPositionsValid && position != expected) {
+        el.nextSibling.classList.remove('hide')
+        el.nextSibling.textContent = 'Expected position ' + expected + ' to be assigned first'
+        playerPositionsValid = valid = false
+      }
+      else {
+        el.nextSibling.classList.add('hide')
+        el.nextSibling.textContent = ''
+      }
+      expected++
+    }
+    if (!playerPositionsValid) return null
+
+    // Input looks good, so create player positions
+    var playerPositions = []
+    els.forEach(function(el, index) {
+      if (el.value != '') {
+        var position = parseInt(el.value, 10)
+        playerPositions[position - 1] = Players.get(index)
+      }
+    })
+    if (!playerPositions.length) {
+      // TODO Display block error
+      valid = false
+    }
+    return playerPositions
+  })()
+
+  // Knockouts input and validation
+  var knockouts = (function() {
+    var knockouts = []
+      , knockoutsValid = true
+      , perps = form.elements.perp
+      , victims = form.elements.victim
+    if (typeof perps.length == 'undefined') {
+      perps = [perps]
+      victims = [victims]
+    }
+    for (var i = 0, l = perps.length; i < l; i++) {
+      var perp = perps[i].value
+        , victim = victims[i].value
+      if (perp == '' || victim == '') {
+        // TODO Display error
+        knockoutsValid = valid = false
+      }
+      else if (perp == victim) {
+        // TODO Display error
+        knockoutsValid = valid = false
+      }
+      else {
+        knockouts.push([
+          Players.get(parseInt(perp, 10))
+        , Players.get(parseInt(victim, 10))
+        ])
+      }
+    }
+    // TODO Validate that all selected players were actually playing in the game
+    // TODO Validate that knockouts are in a logical order
+    return knockouts
+  })()
+
+  // If the form is invalid, display an extra message beside the submit button
+  var btn = form.elements.submitBtn
+    , help = btn.nextSibling
+  if (!valid) {
+    help.classList.remove('hide')
+    help.textContent = 'Please correct input errors.'
+    return
   }
+  else {
+    help.classList.add('hide')
+    help.textContent = ''
+  }
+
   // Add the game to its season
   season.addGame(new Game(date, playerPositions, knockouts))
   Seasons.save(season)
