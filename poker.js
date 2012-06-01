@@ -606,211 +606,240 @@ DOMBuilder.template.$handler = function(func) {
 
 // --------------------------------------------------------------- Templates ---
 
+void function() { with (DOMBuilder.template) {
+
 var template = DOMBuilder.template
-with (template) {
-  $template('league_table'
-  , TABLE({'class': 'table table-striped table-bordered table-condensed'}
-    , THEAD(TR(
-        TH('Player')
-      , TH('Games Played')
-      , TH('Wins')
-      , TH('Average Points Per Game')
-      , TH('Bonus Points')
-      , TH('Lowest Weekly Points')
-      , TH('Overall Points')
-      , TH('Ranking')
-      ))
-    , TBODY($for('score in scores'
-      , TR(
-          TD(
-            A({href: '#', click: $handler(displayPlayer, 'score.player')}
-            , '{{ score.player.name }}'
-            )
-          )
-        , TD('{{ score.getGamesPlayed }}')
-        , TD('{{ score.wins }}')
-        , TD('{{ score.getAveragePointsPerGame }}')
-        , TD('{{ score.getBonusPoints }}')
-        , TD('{{ score.getLowestWeeklyPoints }}')
-        , TD('{{ score.getOverallScore }}')
-        , TD('{{ score.ranking }}')
-        )
-      ))
-    )
-  )
 
-  $template('index'
-  , $if('season'
-    , H1(
-        A({href: '#', click: $handler(displaySeason, 'season')}, '{{ season.name }}')
-      , ' League Table'
-      )
-    , $include('league_table', {scores: $var('season.scores')})
-    , $else(
-        P('There are no Seasons set up yet.')
-      )
-    )
+function toggleAddButton(text) {
+  return template.DIV({'class': 'form-actions'}
+  , template.BUTTON({'class': 'btn btn-primary', type: 'button', click: function(e) {
+      this.parentNode.nextSibling.classList.toggle('hide')
+      this.parentNode.classList.toggle('hide')
+    }}, text)
   )
+}
 
-  $template('player_list'
-  , H1('Players')
-  , UL($for('player in players'
-    , LI(A({href: '#', click: $handler(displayPlayer, 'player')}, '{{ player.name }}'))
+function toggleCancelButton() {
+  return template.BUTTON({'class': 'btn', type: 'button', click: function(e) {
+    this.form.classList.toggle('hide')
+    this.form.previousSibling.classList.toggle('hide')
+    this.form.reset()
+  }}, 'Cancel')
+}
+
+$template('league_table'
+, TABLE({'class': 'table table-striped table-bordered table-condensed'}
+  , THEAD(TR(
+      TH('Player')
+    , TH('Games Played')
+    , TH('Wins')
+    , TH('Average Points Per Game')
+    , TH('Bonus Points')
+    , TH('Lowest Weekly Points')
+    , TH('Overall Points')
+    , TH('Ranking')
     ))
-  , FORM({id: 'addPlayerForm', 'class': 'form-horizontal', submit: addPlayer}
-    , FIELDSET(
-        LEGEND('Add Player')
-      , DIV({'class': 'control-group'}
-        , LABEL({'class': 'control-label', 'for': 'name'}, 'Name')
-        , DIV({'class': 'controls'}
-          , INPUT({'class:': 'input-large', type: 'text', name: 'name', id: 'name'})
-          , P({'class': 'help-block hide'})
+  , TBODY($for('score in scores'
+    , TR(
+        TD(
+          A({href: '#', click: $handler(displayPlayer, 'score.player')}
+          , '{{ score.player.name }}'
           )
         )
-      , DIV({'class': 'form-actions'}
-        , BUTTON({'class': 'btn btn-primary', type: 'submit'}, 'Add Player')
-        )
+      , TD('{{ score.getGamesPlayed }}')
+      , TD('{{ score.wins }}')
+      , TD('{{ score.getAveragePointsPerGame }}')
+      , TD('{{ score.getBonusPoints }}')
+      , TD('{{ score.getLowestWeeklyPoints }}')
+      , TD('{{ score.getOverallScore }}')
+      , TD('{{ score.ranking }}')
       )
-    )
+    ))
   )
+)
 
-  // TODO
-  $template('player_details'
-  , H1('Player: {{ player.name }}')
-  )
-
-  $template('season_list'
-  , H1('Seasons')
-  , TABLE({'class': 'table table-striped table-bordered table-condensed'}
-    , THEAD(TR(
-        TH('Name')
-      , TH('# Games Played')
-      ))
-    , TBODY($for('season in seasons'
-      , TR(
-          TD(
-            A({href: '#', click: $handler(displaySeason, 'season')}
-            , '{{ season.name }}'
-            )
-          )
-        , TD('{{ season.games.length }}')
-        )
-      ))
+$template('index'
+, $if('season'
+  , H1(
+      A({href: '#', click: $handler(displaySeason, 'season')}, '{{ season.name }}')
+    , ' League Table'
     )
-  , FORM({id: 'addSeasonForm', 'class': 'form-horizontal', submit: addSeason}
-    , FIELDSET(
-        LEGEND('Add Season')
-      , DIV({'class': 'control-group'}
-        , LABEL({'class': 'control-label', 'for': 'name'}, 'Name')
-        , DIV({'class': 'controls'}
-          , INPUT({'class:': 'input-large', type: 'text', name: 'name', id: 'name'})
-          , P({'class': 'help-block hide'})
-          )
-        )
-      , DIV({'class': 'form-actions'}
-        , BUTTON({'class': 'btn btn-primary', type: 'submit'}, 'Add Season')
-        )
-      )
-    )
-  )
-
-  $template('season_details'
-  , H1('Season: {{ season.name }}')
-  , H2('League Table')
   , $include('league_table', {scores: $var('season.scores')})
-  , H2('Games')
-  , TABLE({'class': 'table table-striped table-bordered table-condensed'}
-    , THEAD(TR(
-        TH()
-      , TH('Players')
-      , TH('Played On')
-      , TH('Winner')
-      ))
-    , TBODY($for('game in season.games'
-      , TR(
-          TD(A({href: '#', click: $handler(displayGame, 'game')}, 'Game {{ game.getGameNumber }}'))
-        , TD('{{ game.results.length }}')
-        , TD('{{ game.date.toDateString }}')
-        , TD(A({href: '#', click: $handler(displayPlayer, 'game.getWinner')}, '{{ game.getWinner.name }}'))
-        )
-      ))
+  , $else(
+      P('There are no Seasons set up yet.')
     )
-  , FORM({id: 'addGameForm', 'class': 'form-horizontal', submit: $handler(addGame, 'season')}
-    , FIELDSET(
-        LEGEND('Add Game')
-      , DIV({'class': 'control-group'}
-        , LABEL({'class': 'control-label', 'for': 'date'}, 'Date')
-        , DIV({'class': 'controls'}
-          , INPUT({type: 'text', name: 'date', id: 'date', placeholder: 'DD/MM/YYYY'})
-          , P({'class': 'help-block hide'})
-          )
-        )
-      , DIV({'class': 'control-group'}
-        , LABEL({'class': 'control-label'}, 'Results')
-        , DIV({'class': 'controls'}
-          , TABLE({'class': 'table table-condensed table-controls', style: 'width: auto'}
-            , THEAD(TR(
-                TH({style: 'width: 100px'}, 'Player')
-              , TH({style: 'width: 350px'}, 'Position')
-              ))
-            , TBODY($for('player in players'
-              , TR(
-                  TD(LABEL({'for': 'position{{ forloop.counter0 }}'}, '{{ player.name }}'))
-                , TD(
-                    INPUT({type: 'text', name: 'position', id: 'position{{ forloop.counter0 }}', 'class': 'input-mini'})
-                  , SPAN({'class': 'help-inline hide'})
-                  )
-                )
-              ))
-            )
-          , P({'class': 'help-block hide', id: 'results-help'})
-          )
-        )
-      , DIV({'class': 'control-group'}
-        , LABEL({'class': 'control-label'}, 'Knockouts')
-        , DIV({'class': 'controls'}
-          , DIV({'class': 'control-knockout'}
-            , SELECT({'name': 'perp'}
-              , OPTION({value: ''}, '----')
-              , $for('player in players'
-                , OPTION({value: '{{ player.id }}'}, '{{ player.name }}')
-                )
-              )
-            , ' knocked out '
-            , SELECT({'name': 'victim'}
-              , OPTION({value: ''}, '----')
-              , $for('player in players'
-                , OPTION({value: '{{ player.id }}'}, '{{ player.name }}')
-                )
-              )
-            , P({'class': 'help-block hide'})
-            )
-          , P(BUTTON({'class': 'btn btn-success', type: 'button', click: cloneKnockout}
-            , I({'class': 'icon-plus icon-white'})
-            , ' Add'
-            ))
-          )
-        )
-      , DIV({'class': 'form-actions'}
-        , BUTTON({'class': 'btn btn-primary', type: 'submit', name: 'submitBtn'}, 'Add Game')
+  )
+)
+
+$template('player_list'
+, H1('Players')
+, UL($for('player in players'
+  , LI(A({href: '#', click: $handler(displayPlayer, 'player')}, '{{ player.name }}'))
+  ))
+, toggleAddButton('Add Player')
+, FORM({id: 'addPlayerForm', 'class': 'form-horizontal hide', submit: addPlayer}
+  , FIELDSET(
+      LEGEND('Add Player')
+    , DIV({'class': 'control-group'}
+      , LABEL({'class': 'control-label', 'for': 'name'}, 'Name')
+      , DIV({'class': 'controls'}
+        , INPUT({'class:': 'input-large', type: 'text', name: 'name', id: 'name'})
         , P({'class': 'help-block hide'})
         )
       )
+    , DIV({'class': 'form-actions'}
+      , BUTTON({'class': 'btn btn-primary', type: 'submit'}, 'Add Player')
+      , ' '
+      , toggleCancelButton()
+      )
     )
   )
+)
 
-  $template('game_details'
-  , H1(
-      'Game {{ game.getGameNumber }} in '
-    , A({href: '#', click: $handler(displaySeason, 'game.season')}, '{{ game.season.name }}')
-    , ', played on {{ game.date.toDateString }}'
-    )
-  , H2('Story of the Game')
-  , $for('line in game.story'
-    , P('{{ line }}')
+// TODO
+$template('player_details'
+, H1('Player: {{ player.name }}')
+)
+
+$template('season_list'
+, H1('Seasons')
+, TABLE({'class': 'table table-striped table-bordered table-condensed'}
+  , THEAD(TR(
+      TH('Name')
+    , TH('# Games Played')
+    ))
+  , TBODY($for('season in seasons'
+    , TR(
+        TD(
+          A({href: '#', click: $handler(displaySeason, 'season')}
+          , '{{ season.name }}'
+          )
+        )
+      , TD('{{ season.games.length }}')
+      )
+    ))
+  )
+, toggleAddButton('Add Season')
+, FORM({id: 'addSeasonForm', 'class': 'form-horizontal hide', submit: addSeason}
+  , FIELDSET(
+      LEGEND('Add Season')
+    , DIV({'class': 'control-group'}
+      , LABEL({'class': 'control-label', 'for': 'name'}, 'Name')
+      , DIV({'class': 'controls'}
+        , INPUT({'class:': 'input-large', type: 'text', name: 'name', id: 'name'})
+        , P({'class': 'help-block hide'})
+        )
+      )
+    , DIV({'class': 'form-actions'}
+      , BUTTON({'class': 'btn btn-primary', type: 'submit'}, 'Add Season')
+      , ' '
+      , toggleCancelButton()
+      )
     )
   )
-}
+)
+
+$template('season_details'
+, H1('Season: {{ season.name }}')
+, H2('League Table')
+, $include('league_table', {scores: $var('season.scores')})
+, H2('Games')
+, TABLE({'class': 'table table-striped table-bordered table-condensed'}
+  , THEAD(TR(
+      TH()
+    , TH('Players')
+    , TH('Played On')
+    , TH('Winner')
+    ))
+  , TBODY($for('game in season.games'
+    , TR(
+        TD(A({href: '#', click: $handler(displayGame, 'game')}, 'Game {{ game.getGameNumber }}'))
+      , TD('{{ game.results.length }}')
+      , TD('{{ game.date.toDateString }}')
+      , TD(A({href: '#', click: $handler(displayPlayer, 'game.getWinner')}, '{{ game.getWinner.name }}'))
+      )
+    ))
+  )
+, toggleAddButton('Add Game')
+, FORM({id: 'addGameForm', 'class': 'form-horizontal hide', submit: $handler(addGame, 'season')}
+  , FIELDSET(
+      LEGEND('Add Game')
+    , DIV({'class': 'control-group'}
+      , LABEL({'class': 'control-label', 'for': 'date'}, 'Date')
+      , DIV({'class': 'controls'}
+        , INPUT({type: 'text', name: 'date', id: 'date', placeholder: 'DD/MM/YYYY'})
+        , P({'class': 'help-block hide'})
+        )
+      )
+    , DIV({'class': 'control-group'}
+      , LABEL({'class': 'control-label'}, 'Results')
+      , DIV({'class': 'controls'}
+        , TABLE({'class': 'table table-condensed table-controls', style: 'width: auto'}
+          , THEAD(TR(
+              TH({style: 'width: 100px'}, 'Player')
+            , TH({style: 'width: 350px'}, 'Position')
+            ))
+          , TBODY($for('player in players'
+            , TR(
+                TD(LABEL({'for': 'position{{ forloop.counter0 }}'}, '{{ player.name }}'))
+              , TD(
+                  INPUT({type: 'text', name: 'position', id: 'position{{ forloop.counter0 }}', 'class': 'input-mini'})
+                , SPAN({'class': 'help-inline hide'})
+                )
+              )
+            ))
+          )
+        , P({'class': 'help-block hide', id: 'results-help'})
+        )
+      )
+    , DIV({'class': 'control-group'}
+      , LABEL({'class': 'control-label'}, 'Knockouts')
+      , DIV({'class': 'controls'}
+        , DIV({'class': 'control-knockout'}
+          , SELECT({'name': 'perp'}
+            , OPTION({value: ''}, '----')
+            , $for('player in players'
+              , OPTION({value: '{{ player.id }}'}, '{{ player.name }}')
+              )
+            )
+          , ' knocked out '
+          , SELECT({'name': 'victim'}
+            , OPTION({value: ''}, '----')
+            , $for('player in players'
+              , OPTION({value: '{{ player.id }}'}, '{{ player.name }}')
+              )
+            )
+          , P({'class': 'help-block hide'})
+          )
+        , P(BUTTON({'class': 'btn btn-success', type: 'button', click: cloneKnockout}
+          , I({'class': 'icon-plus icon-white'})
+          , ' Add'
+          ))
+        )
+      )
+    , DIV({'class': 'form-actions'}
+      , BUTTON({'class': 'btn btn-primary', type: 'submit', name: 'submitBtn'}, 'Add Game')
+      , ' '
+      , toggleCancelButton()
+      , P({'class': 'help-block hide'})
+      )
+    )
+  )
+)
+
+$template('game_details'
+, H1(
+    'Game {{ game.getGameNumber }} in '
+  , A({href: '#', click: $handler(displaySeason, 'game.season')}, '{{ game.season.name }}')
+  , ', played on {{ game.date.toDateString }}'
+  )
+, H2('Story of the Game')
+, $for('line in game.story'
+  , P('{{ line }}')
+  )
+)
+
+}}()
 
 // =================================================================== Views ===
 
@@ -824,7 +853,7 @@ function stop(e) {
 function displayContent(templateName, contextVariables) {
   var el = document.getElementById('contents')
   el.innerHTML = ''
-  el.appendChild(template.renderTemplate(templateName, contextVariables))
+  el.appendChild(DOMBuilder.template.renderTemplate(templateName, contextVariables))
 }
 
 /**
@@ -1090,7 +1119,7 @@ function addGame(season, e) {
 
   // If the form is invalid, display an extra message below the submit button
   var btn = form.elements.submitBtn
-    , help = btn.nextSibling
+    , help = btn.parentNode.lastChild
     , errorMessage = valid ? null : 'Please correct input errors.'
   toggleError(errorMessage, help)
   if (!valid) {
