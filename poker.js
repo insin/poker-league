@@ -194,6 +194,10 @@ Season.prototype.addGame = function(game, sortScores) {
   }
 }
 
+Season.prototype.lastGame = function() {
+  return this.games.length ? this.games[this.games.length - 1] : null
+}
+
 /**
  * Sorts scores based on overall score.
  */
@@ -499,9 +503,9 @@ var LocalStorage = Concur.extend({
 var Players = new LocalStorage(Player, 'players')
 var Seasons = new LocalStorage(Season, 'seasons')
 
-// ====================================================================== UI ===
+// =============================================================== Templates ===
 
-// ---------------------------------------------------- Custom TemplateNodes ---
+// ---------------------------------------------------------- Template Nodes ---
 
 var templateAPI = DOMBuilder.modes.template.api
 
@@ -523,7 +527,7 @@ var EventHandlerNode = templateAPI.TemplateNode.extend({
     var func = (typeof this.func == 'function' ? this.func : this.func.resolve(context))
       , args = this.args.map(function(arg) { return arg.resolve(context) })
     return function() {
-      func.apply(this, args.concat(Array.prototype.slice.call(arguments, 0)))
+      func.apply(this, args.concat(Array.prototype.slice.call(arguments)))
     }
   }
 })
@@ -696,7 +700,7 @@ with (template) {
       , DIV({'class': 'control-group'}
         , LABEL({'class': 'control-label'}, 'Knockouts')
         , DIV({'class': 'controls'}
-          , DIV({style: 'margin-bottom: 9px'}
+          , DIV({'class': 'control-knockout'}
             , SELECT({'name': 'perp'}
               , OPTION({value: ''}, '----')
               , $for('player in players'
@@ -710,24 +714,17 @@ with (template) {
                 , OPTION({value: '{{ player.id }}'}, '{{ player.name }}')
                 )
               )
+            , P({'class': 'help-block hide'})
             )
-          , P(BUTTON({'class': 'btn btn-success', type: 'button', click: function(e) {
-              var ko = this.parentNode.parentNode.firstChild.cloneNode(true)
-              var el = DOMBuilder.dom
-              ko.appendChild(
-                el.SPAN({'class': 'help-inline'}
-                , el.BUTTON({'class': 'btn btn-danger', type: 'button', click: function(e) {
-                    this.parentNode.parentNode.parentNode.removeChild(this.parentNode.parentNode)
-                  }}, el.I({'class': 'icon-minus'}))
-                )
-              )
-              this.parentNode.insertBefore(ko, this)
-            }}, I({'class': 'icon-plus'})))
+          , P(BUTTON({'class': 'btn btn-success', type: 'button', click: cloneKnockout}
+            , I({'class': 'icon-plus icon-white'})
+            , ' Add'
+            ))
           )
         )
       , DIV({'class': 'form-actions'}
         , BUTTON({'class': 'btn btn-primary', type: 'submit', name: 'submitBtn'}, 'Add Game')
-        , SPAN({'class': 'help-inline hide'})
+        , P({'class': 'help-block hide'})
         )
       )
     )
@@ -746,7 +743,9 @@ with (template) {
   )
 }
 
-// ------------------------------------------------------------------- Views ---
+// =================================================================== Views ===
+
+// ------------------------------------------------------------------- Utils ---
 
 function stop(e) {
   e.preventDefault()
@@ -758,6 +757,48 @@ function displayContent(templateName, contextVariables) {
   el.innerHTML = ''
   el.appendChild(template.renderTemplate(templateName, contextVariables))
 }
+
+/**
+ * Shows a error message in a help element if it is not null, otherwise hide
+ * and clears the element. If a container is given, an error class will be added
+ * or removed, as appropriate.
+ */
+function toggleError(errorMessage, help, container) {
+  if (errorMessage !== null) {
+    if (container) {
+      container.classList.add('error')
+    }
+    help.classList.remove('hide')
+    help.textContent = errorMessage
+  }
+  else {
+    if (container) {
+      container.classList.remove('error')
+    }
+    help.classList.add('hide')
+    help.textContent = ''
+  }
+}
+
+function cloneKnockout(e) {
+  // "+ Add" button -> first KO node
+  var ko = this.parentNode.parentNode.firstChild.cloneNode(true)
+  var el = DOMBuilder.dom
+  // Create and insert a "- Remove" button
+  ko.insertBefore(
+    el.SPAN({'class': 'help-inline'}
+    , el.BUTTON({'class': 'btn btn-danger', type: 'button', click: function(e) {
+        this.parentNode.parentNode.parentNode.removeChild(this.parentNode.parentNode)
+      }}, el.I({'class': 'icon-minus icon-white'}), ' Remove')
+    )
+  , ko.lastChild
+  )
+  // Reset any error display the first KO node may have before inserting
+  toggleError(null, ko.lastChild, ko)
+  this.parentNode.insertBefore(ko, this)
+}
+
+// ---------------------------------------------------------- View Functions ---
 
 function index(e) {
   if (e) stop(e)
@@ -820,22 +861,17 @@ function addGame(season, e) {
   var date = (function() {
     var date = null
       , el = form.elements.date
-      , contentGroup = el.parentNode.parentNode
+      , container = el.parentNode.parentNode
       , help = el.nextSibling
+      , errorMessage = null
     try {
       date = isomorph.time.strpdate(form.elements.date.value, INPUT_DATE_FORMAT)
-      contentGroup.classList.remove('error')
-      contentGroup.classList.add('success')
-      help.classList.add('hide')
-      help.textContent = ''
     }
     catch (e) {
-      contentGroup.classList.remove('success')
-      contentGroup.classList.add('error')
-      help.classList.remove('hide')
-      help.textContent = 'Enter a valid date in DD/MM/YYYY format.'
+      errorMessage = 'Enter a valid date in DD/MM/YYYY format.'
       valid = false
     }
+    toggleError(errorMessage, help, container)
     return date
   })()
 
@@ -843,69 +879,64 @@ function addGame(season, e) {
   var playerPositions = (function() {
     var playerPositionsValid = true
       , els = Array.prototype.slice.call(form.elements.position)
-      , help = document.getElementById('results-help')
-
+      , resultsHelp = document.getElementById('results-help')
+      , resultsContainer = resultsHelp.parentNode.parentNode
+      , resultsErrorMessage = null
     // All blank is invalid
     if (els.filter(function(el) { return el.value != '' }).length == 0) {
-      help.parentNode.parentNode.classList.add('error')
-      help.classList.remove('hide')
-      help.textContent = 'Enter the position each player who played finished in.'
-      playerPositionsValid = valid = false
+      resultsErrorMessage = 'For each player who played, enter the position they finished in.'
     }
-    else {
-      help.parentNode.parentNode.classList.remove('error')
-      help.classList.add('hide')
-      help.textContent = ''
-    }
+    if (resultsErrorMessage !== null) playerPositionsValid = valid = false
+    toggleError(resultsErrorMessage, resultsHelp, resultsContainer)
 
-    // Check that position inputs are valid
+    // Check that position inputs are valid - keep going even if we detected
+    // that all inputs are blank in order to clear individual error messages.
     els.forEach(function(el) {
-      // Blank or numeric is valid
-      if (el.value != '' && !/^\d\d?$/.test(el.value)) {
-        el.parentNode.parentNode.classList.add('error')
-        el.nextSibling.classList.remove('hide')
-        el.nextSibling.textContent = 'Invalid position'
-        playerPositionsValid = valid = false
+      var container = el.parentNode.parentNode
+        , help = el.nextSibling
+        , errorMessage = null
+      // Blank is valid, as we've verified that they're not all blank and not
+      // all players have to play in each game.
+      if (el.value != '') {
+        if (!/^\d+$/.test(el.value)) {
+          errorMessage = 'Positions must be numeric.'
+        }
+        else if (parseInt(el.value, 10) > Players.all().length) {
+          errorMessage = 'Position greater than number of players.'
+        }
       }
-      else {
-        el.parentNode.parentNode.classList.remove('error')
-        el.nextSibling.classList.add('hide')
-        el.nextSibling.textContent = ''
-      }
+      if (errorMessage !== null) playerPositionsValid = valid = false
+      toggleError(errorMessage, help, container)
     })
 
-    if (!playerPositionsValid) return
+    if (!playerPositionsValid) return null
 
     // If we're still good, check for gaps
     var expected = 1
-      , sortedEls =
-            els.slice()
-               .filter(function(el) { return el.value != '' })
-               .sort(function(a, b) {
-                  return parseInt(a.value, 10) - parseInt(b.value, 10)
-                })
+      , sortedEls = els.slice()
+                       .filter(function(el) { return el.value != '' })
+                       .sort(function(a, b) {
+                          return parseInt(a.value, 10) - parseInt(b.value, 10)
+                        })
     for (var i = 0, l = sortedEls.length ; i < l; i++) {
       var el = sortedEls[i]
         , position = parseInt(el.value, 10)
+        , container = el.parentNode.parentNode
+        , help = el.nextSibling
+        , errorMessage = null
       // Stop checking after the first invalid position, but keep looping to
       // clear any previous validation errors which may have been displayed.
       if (playerPositionsValid && position != expected) {
-        el.parentNode.parentNode.classList.add('error')
-        el.nextSibling.classList.remove('hide')
-        el.nextSibling.textContent = 'Expected position ' + expected + ' to be assigned first'
-        playerPositionsValid = valid = false
+        errorMessage = 'Expected position ' + expected + ' to be assigned first.'
       }
-      else {
-        el.parentNode.parentNode.classList.remove('error')
-        el.nextSibling.classList.add('hide')
-        el.nextSibling.textContent = ''
-      }
+      if (errorMessage !== null) playerPositionsValid = valid = false
+      toggleError(errorMessage, help, container)
       expected++
     }
 
-    if (!playerPositionsValid) return
+    if (!playerPositionsValid) return null
 
-    // Input looks good, so create player positions
+    // Input looks good, so create player position array
     var playerPositions = []
     els.forEach(function(el, index) {
       if (el.value != '') {
@@ -913,7 +944,6 @@ function addGame(season, e) {
         playerPositions[position - 1] = Players.get(index)
       }
     })
-
     return playerPositions
   })()
 
@@ -921,46 +951,65 @@ function addGame(season, e) {
   var knockouts = (function() {
     var knockouts = []
       , knockoutsValid = true
-      , perps = form.elements.perp
-      , victims = form.elements.victim
-    if (typeof perps.length == 'undefined') {
-      perps = [perps]
-      victims = [victims]
+      , perpEls = form.elements.perp
+      , victimEls = form.elements.victim
+      , victims = []
+    if (typeof perpEls.nodeType != 'undefined') {
+      perpEls = [perpEls]
+      victimEls = [victimEls]
     }
-    for (var i = 0, l = perps.length; i < l; i++) {
-      var perp = perps[i].value
-        , victim = victims[i].value
+    for (var i = 0, l = perpEls.length; i < l; i++) {
+      var perp = perpEls[i].value
+        , victim = victimEls[i].value
+        , container = victimEls[i].parentNode
+        , help = container.lastChild
+        , errorMessage = null
       if (perp == '' || victim == '') {
-        // TODO Display error
-        knockoutsValid = valid = false
+        errorMessage = 'Select a player from each dropdown.'
       }
       else if (perp == victim) {
-        // TODO Display error
-        knockoutsValid = valid = false
+        errorMessage ='A player cannot knock themselves out.'
       }
       else {
-        knockouts.push([
-          Players.get(parseInt(perp, 10))
-        , Players.get(parseInt(victim, 10))
-        ])
+        perp = Players.get(parseInt(perp, 10))
+        victim = Players.get(parseInt(victim, 10))
+        // Validate that selected players were actually playing in this game
+        if (playerPositions && playerPositions.indexOf(perp) == -1) {
+          errorMessage = perp.name + " didn't play in this game (no position entered)."
+        }
+        else if (playerPositions && playerPositions.indexOf(victim) == -1) {
+          errorMessage = victim.name + " didn't play in this game (no position entered)."
+        }
+        else if (playerPositions && playerPositions.indexOf(victim) == 0) {
+          errorMessage = "You can't knock the winner out."
+        }
+        // Validate that selected players haven't already been knocked out
+        else if (victims.indexOf(perp) != -1) {
+          errorMessage = perp.name + ' has already been knocked out.'
+        }
+        else if (victims.indexOf(victim) != -1) {
+          errorMessage = victim.name + ' has already been knocked out.'
+        }
+        else {
+          knockouts.push([
+            Players.get(parseInt(perp, 10))
+          , Players.get(parseInt(victim, 10))
+          ])
+        }
       }
+      if (errorMessage !== null) knockoutsValid = valid = false
+      toggleError(errorMessage, help, container)
     }
-    // TODO Validate that all selected players were actually playing in the game
-    // TODO Validate that knockouts are in a logical order
     return knockouts
   })()
 
-  // If the form is invalid, display an extra message beside the submit button
+  // If the form is invalid, display an extra message below the submit button
   var btn = form.elements.submitBtn
     , help = btn.nextSibling
+    , errorMessage = valid ? null : 'Please correct input errors.'
+  toggleError(errorMessage, help)
   if (!valid) {
-    help.classList.remove('hide')
-    help.textContent = 'Please correct input errors.'
     return
-  }
-  else {
-    help.classList.add('hide')
-    help.textContent = ''
   }
 
   // Add the game to its season
