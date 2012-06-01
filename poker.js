@@ -15,11 +15,11 @@ if (!Array.prototype.sum) {
 
 // ------------------------------------------------------------------ Player ---
 
-function Player(id, name) {
+function Player(name) {
   /**
-   * Unique id for the player.
+   * Unique id, set by storage.
    */
-  this.id = id
+  this.id = null
   /**
    * The player's name.
    */
@@ -31,11 +31,13 @@ Player.prototype.toString = function() {
 }
 
 Player.prototype.toObject = function() {
-  return {id: this.id, name: this.name}
+  return {name: this.name}
 }
 
-Player.fromObject = function(obj) {
-  return new Player(obj.id, obj.name)
+Player.fromObject = function(obj, id) {
+  var player = new Player(obj.name)
+  player.id = id
+  return player
 }
 
 // ------------------------------------------------------------------- Score ---
@@ -146,6 +148,10 @@ Score.prototype.getOverallScore = function() {
  */
 function Season(name) {
   /**
+   * Unique id, set by storage.
+   */
+  this.id = null
+  /**
    * Whimsy, the obvious, whatever you like.
    */
   this.name = name
@@ -166,8 +172,9 @@ Season.prototype.toObject = function() {
   }
 }
 
-Season.fromObject = function(obj) {
+Season.fromObject = function(obj, id) {
   var season = new Season(obj.name)
+  season.id = id
   obj.games.forEach(function(gameObj) {
     season.addGame(Game.fromObject(gameObj), false)
   })
@@ -597,6 +604,7 @@ with (template) {
         , LABEL({'class': 'control-label', 'for': 'name'}, 'Name')
         , DIV({'class': 'controls'}
           , INPUT({'class:': 'input-large', type: 'text', name: 'name', id: 'name'})
+          , P({'class': 'help-block hide'})
           )
         )
       , DIV({'class': 'form-actions'}
@@ -636,6 +644,7 @@ with (template) {
         , LABEL({'class': 'control-label', 'for': 'name'}, 'Name')
         , DIV({'class': 'controls'}
           , INPUT({'class:': 'input-large', type: 'text', name: 'name', id: 'name'})
+          , P({'class': 'help-block hide'})
           )
         )
       , DIV({'class': 'form-actions'}
@@ -817,8 +826,16 @@ function playersList(e) {
 function addPlayer(e) {
   if (e) stop(e)
   var form = document.getElementById('addPlayerForm')
-  if (!form.elements.name.value) return alert('Name is required to add a new Player.')
-  var player = Players.add(new Player(players.length, form.elements.name.value))
+    , name = form.elements.name.value
+    , help = form.elements.name.nextSibling
+    , container = help.parentNode.parentNode
+    , errorMessage = name ? null : 'Name is required to add a new Player.'
+  toggleError(errorMessage, help, container)
+  if (!name) {
+    return
+  }
+
+  var player = Players.add(new Player(name))
   playersList()
 }
 
@@ -839,8 +856,16 @@ function seasonsList(e) {
 function addSeason(e) {
   if (e) stop(e)
   var form = document.getElementById('addSeasonForm')
-  if (!form.elements.name.value) return alert('Name is required to add a new Season.')
-  var season = Seasons.add(new Season(form.elements.name.value))
+    , name = form.elements.name.value
+    , help = form.elements.name.nextSibling
+    , container = help.parentNode.parentNode
+    , errorMessage = name ? null : 'Name is required to add a new Season.'
+  toggleError(errorMessage, help, container)
+  if (!name) {
+    return
+  }
+
+  var season = Seasons.add(new Season(name))
   displaySeason(season)
 }
 
