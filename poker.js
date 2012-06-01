@@ -62,6 +62,10 @@ function Score(player) {
    * Number of games won by the player.
    */
   this.wins = 0
+  /**
+   * Ranking relative to other players in the same sequence of games.
+   */
+  this.ranking = null
 }
 
 /**
@@ -212,6 +216,50 @@ Season.prototype.sortScores = function() {
   this.scores.sort(function(a, b) {
     return b.getOverallScore() - a.getOverallScore()
   })
+
+  /**
+   * Assigns a rank to a list of scores - if more than one score is gettig the
+   * same rank, it will be suffixed with '='.
+   */
+  function assignRank(rank, scores) {
+    var assignedRank = rank + (scores.length > 1 ? '=' : '')
+    scores.forEach(function(score) {
+      score.ranking = assignedRank
+    })
+  }
+
+  // Update rankings
+  var rank = 1
+    , rankScores
+    , comparisonScore
+  for (var i = 0, l = this.scores.length; i < l; i++) {
+    var score = this.scores[i]
+    // Set up the first score check with the first score
+    if (i == 0) {
+      comparisonScore = score.getOverallScore()
+      rankScores = [score]
+    }
+    // If subsequent scores are the same, we buffer them until we find the next
+    // score which is lower.
+    else if (score.getOverallScore() == comparisonScore) {
+      rankScores.push(score)
+    }
+    // Scores are sorted by overallScore descending, so this one must be lower
+    else {
+      // Assign ranks to the buffered scores
+      assignRank(rank, rankScores)
+      // Increase the next rank to be given by the number of scores we just
+      // assigned the same rank to.
+      rank += rankScores.length
+      // Reset score check and buffer to the current score
+      comparisonScore = score.getOverallScore()
+      rankScores = [score]
+    }
+    // Assign ranks to whatever's left in the buffer after the last score
+    if (i == l - 1) {
+      assignRank(rank, rankScores)
+    }
+  }
 }
 
 // -------------------------------------------------------------------- Game ---
@@ -560,6 +608,7 @@ with (template) {
       , TH('Bonus Points')
       , TH('Lowest Weekly Points')
       , TH('Overall Points')
+      , TH('Ranking')
       ))
     , TBODY($for('score in scores'
       , TR(
@@ -574,6 +623,7 @@ with (template) {
         , TD('{{ score.getBonusPoints }}')
         , TD('{{ score.getLowestWeeklyPoints }}')
         , TD('{{ score.getOverallScore }}')
+        , TD('{{ score.ranking }}')
         )
       ))
     )
