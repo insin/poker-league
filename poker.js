@@ -699,6 +699,36 @@ $template('player_list'
 // TODO
 $template('player_details'
 , H1('Player: {{ player.name }}')
+, H2('All-Time Rankings')
+, $for('season, score in seasonScores'
+  , H3(
+      'Season: '
+    , A({href: '#', click: $handler(displaySeason, 'season')}, '{{ season.name }}')
+    )
+  , TABLE({'class': 'table table-striped table-bordered table-condensed'}
+    , THEAD(TR(
+        TH('Games Played')
+      , TH('Wins')
+      , TH('Average Points Per Game')
+      , TH('Bonus Points')
+      , TH('Lowest Weekly Points')
+      , TH('Overall Points')
+      , TH('Ranking')
+      ))
+    , TBODY(
+        TR(
+          TD('{{ score.getGamesPlayed }}')
+        , TD('{{ score.wins }}')
+        , TD('{{ score.getAveragePointsPerGame }}')
+        , TD('{{ score.getBonusPoints }}')
+        , TD('{{ score.getLowestWeeklyPoints }}')
+        , TD('{{ score.getOverallScore }}')
+        , TD('{{ score.ranking }}')
+        )
+      )
+    )
+  , $empty("This player hasn't played any games yet.")
+  )
 )
 
 $template('season_list'
@@ -930,8 +960,19 @@ function addPlayer(e) {
 
 function displayPlayer(player, e) {
   if (e) stop(e)
+  var seasonScores = []
+  Seasons.all().forEach(function(season) {
+    for (var i = 0, l = season.scores.length; i < l; i++) {
+      var score = season.scores[i]
+      if (score.player === player) {
+        seasonScores.push([season, score])
+        break
+      }
+    }
+  })
   displayContent('player_details', {
     player: player
+  , seasonScores: seasonScores
   })
 }
 
