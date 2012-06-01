@@ -145,6 +145,16 @@ Score.prototype.getOverallScore = function() {
                              .sum()                                 // Add 'em up
 }
 
+/**
+ * Determines if this score ranks higher than another. Returns a negative number
+ * if this score ranks higher, zero if the scores rank equally or a positive
+ * number if the other score ranks higher, so this can be used with an array
+ * sort to sort scores in winner-first fashion.
+ */
+Score.prototype.compareTo = function(score) {
+  return (score.getOverallScore() - this.getOverallScore())
+}
+
 // ------------------------------------------------------------------ Season ---
 
 /**
@@ -210,11 +220,11 @@ Season.prototype.lastGame = function() {
 }
 
 /**
- * Sorts scores based on overall score.
+ * Sorts scores based on overall score and updates their rankings.
  */
 Season.prototype.sortScores = function() {
   this.scores.sort(function(a, b) {
-    return b.getOverallScore() - a.getOverallScore()
+    return a.compareTo(b)
   })
 
   /**
