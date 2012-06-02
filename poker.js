@@ -171,7 +171,26 @@ Score.prototype.getOverallScore = function() {
  * sort to sort scores in winner-first fashion.
  */
 Score.prototype.compareTo = function(score) {
-  return (score.getOverallScore() - this.getOverallScore())
+  // Overall score, descending
+  if (score.getOverallScore() != this.getOverallScore()) {
+    return score.getOverallScore() - this.getOverallScore()
+  }
+  // Wins, descending
+  else if (score.wins != this.wins) {
+    return score.wins - this.wins
+  }
+  // Games played, ascending (higher average score is better)
+  else if (this.getGamesPlayed() != score.getGamesPlayed()) {
+    return this.getGamesPlayed() - score.getGamesPlayed()
+  }
+  // Fish-chip points, descending
+  else if (score.getFishChipPoints() != this.getFishChipPoints()) {
+    return score.getFishChipPoints() - this.getFishChipPoints()
+  }
+  // Name, ascending (blame your parents if you lose based on this!)
+  else {
+    return this.name == score.name ? 0 : (this.name < score.name ? -1 : 1)
+  }
 }
 
 // ------------------------------------------------------------------ Season ---
