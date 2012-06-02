@@ -706,7 +706,10 @@ $template('index'
       , ' League Table'
       )
     )
-  , $include('league_table', {scores: $var('season.scores')})
+  , $if('season.games.length'
+    , $include('league_table', {scores: $var('season.scores')})
+    , $else('The League Table will begin as soon as some games have been played.')
+    )
   , $else(
       P('There are no Seasons set up yet.')
     )
@@ -717,9 +720,12 @@ $template('player_list'
 , DIV({'class': 'page-header'}
   , H1('Players')
   )
-, UL($for('player in players'
-  , LI(A({href: '#', click: $handler(displayPlayer, 'player')}, '{{ player.name }}'))
-  ))
+, $if('players.length'
+  , UL($for('player in players'
+    , LI(A({href: '#', click: $handler(displayPlayer, 'player')}, '{{ player.name }}'))
+    ))
+  , $else('None yet - add one below.')
+  )
 , toggleAddButton('Add Player')
 , FORM({id: 'addPlayerForm', 'class': 'form-horizontal hide', submit: addPlayer}
   , FIELDSET(
@@ -781,21 +787,24 @@ $template('season_list'
 , DIV({'class': 'page-header'}
   , H1('Seasons')
   )
-, TABLE({'class': 'table table-striped table-bordered table-condensed'}
-  , THEAD(TR(
-      TH('Name')
-    , TH('# Games Played')
-    ))
-  , TBODY($for('season in seasons'
-    , TR(
-        TD(
-          A({href: '#', click: $handler(displaySeason, 'season')}
-          , '{{ season.name }}'
+, $if('seasons.length'
+  ,TABLE({'class': 'table table-striped table-bordered table-condensed'}
+    , THEAD(TR(
+        TH('Name')
+      , TH('# Games Played')
+      ))
+    , TBODY($for('season in seasons'
+      , TR(
+          TD(
+            A({href: '#', click: $handler(displaySeason, 'season')}
+            , '{{ season.name }}'
+            )
           )
+        , TD('{{ season.games.length }}')
         )
-      , TD('{{ season.games.length }}')
-      )
-    ))
+      ))
+    )
+  , $else(P('None yet - add one below.'))
   )
 , toggleAddButton('Add Season')
 , FORM({id: 'addSeasonForm', 'class': 'form-horizontal hide', submit: addSeason}
@@ -821,24 +830,25 @@ $template('season_details'
 , DIV({'class': 'page-header'}
   , H1('Season: {{ season.name }}')
   )
-, H2('League Table')
-, $include('league_table', {scores: $var('season.scores')})
 , H2('Games')
-, TABLE({'class': 'table table-striped table-bordered table-condensed'}
-  , THEAD(TR(
-      TH()
-    , TH('Players')
-    , TH('Played On')
-    , TH('Winner')
-    ))
-  , TBODY($for('game in season.games'
-    , TR(
-        TD(A({href: '#', click: $handler(displayGame, 'game')}, 'Game {{ game.getGameNumber }}'))
-      , TD('{{ game.results.length }}')
-      , TD('{{ game.date.toDateString }}')
-      , TD(A({href: '#', click: $handler(displayPlayer, 'game.getWinner')}, '{{ game.getWinner.name }}'))
-      )
-    ))
+, $if('season.games.length'
+  , TABLE({'class': 'table table-striped table-bordered table-condensed'}
+    , THEAD(TR(
+        TH()
+      , TH('Players')
+      , TH('Played On')
+      , TH('Winner')
+      ))
+    , TBODY($for('game in season.games'
+      , TR(
+          TD(A({href: '#', click: $handler(displayGame, 'game')}, 'Game {{ game.getGameNumber }}'))
+        , TD('{{ game.results.length }}')
+        , TD('{{ game.date.toDateString }}')
+        , TD(A({href: '#', click: $handler(displayPlayer, 'game.getWinner')}, '{{ game.getWinner.name }}'))
+        )
+      ))
+    )
+  , $else(P('None yet - add one below.'))
   )
 , toggleAddButton('Add Game')
 , FORM({id: 'addGameForm', 'class': 'form-horizontal hide', submit: $handler(addGame, 'season')}
@@ -856,7 +866,7 @@ $template('season_details'
       , DIV({'class': 'controls'}
         , TABLE({'class': 'table table-condensed table-controls', style: 'width: auto'}
           , THEAD(TR(
-              TH({style: 'width: 100px'}, 'Player')
+              TH({style: 'width: 150px'}, 'Player')
             , TH({style: 'width: 350px'}, 'Position')
             ))
           , TBODY($for('player in players'
@@ -905,6 +915,11 @@ $template('season_details'
       , P({'class': 'help-block hide'})
       )
     )
+  )
+, H2('League Table')
+, $if('season.games.length'
+  , $include('league_table', {scores: $var('season.scores')})
+  , $else('The League Table will begin as soon as some games have been played.')
   )
 )
 
