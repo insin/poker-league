@@ -920,6 +920,18 @@ $template('game_details'
 , $for('line in game.story'
   , P('{{ line }}')
   )
+, UL({'class': 'pager'}
+  , $if('previousGame'
+    , LI({'class': 'previous'}
+      , A({href: '#', click: $handler(displayGame, 'previousGame')}, '\u2190 Previous Game')
+      )
+    )
+  , $if('nextGame'
+    , LI({'class': 'next'}
+      , A({href: '#', click: $handler(displayGame, 'nextGame')}, 'Next Game \u2192')
+      )
+    )
+  )
 )
 
 }}()
@@ -1227,8 +1239,13 @@ function addGame(season, e) {
 
 function displayGame(game, e) {
   if (e) stop(e)
+  var season = game.season
   displayContent('game_details', {
     game: game
+  , previousGame: game.index > 0 ? season.games[game.index - 1] : null
+  , nextGame: (game.index < season.games.length - 1
+               ? season.games[game.index + 1]
+               : null)
   })
 }
 
