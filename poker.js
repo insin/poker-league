@@ -991,10 +991,25 @@ function cloneKnockout(e) {
   this.parentNode.insertBefore(ko, this)
 }
 
+function activateNav(linkId) {
+  var navLinks = document.getElementById('navLinks')
+    , link = linkId !== null ? document.getElementById(linkId) : null
+    , item = link !== null ? link.parentNode : null
+  for (var el = navLinks.firstElementChild; el; el = el.nextElementSibling) {
+    if (el === item) {
+      el.classList.add('active')
+    }
+    else {
+      el.classList.remove('active')
+    }
+  }
+}
+
 // ---------------------------------------------------------- View Functions ---
 
 function index(e) {
   if (e) stop(e)
+  activateNav(null)
   displayContent('index', {
     season: Seasons.all().pop()
   })
@@ -1002,6 +1017,7 @@ function index(e) {
 
 function playersList(e) {
   if (e) stop(e)
+  activateNav('navPlayers')
   displayContent('player_list', {
     players: Players.all()
   })
@@ -1025,6 +1041,7 @@ function addPlayer(e) {
 
 function displayPlayer(player, e) {
   if (e) stop(e)
+  activateNav('navPlayers')
   var seasonScores = []
   Seasons.all().forEach(function(season) {
     for (var i = 0, l = season.scores.length; i < l; i++) {
@@ -1043,6 +1060,7 @@ function displayPlayer(player, e) {
 
 function seasonsList(e) {
   if (e) stop(e)
+  activateNav('navSeasons')
   displayContent('season_list', {
     seasons: Seasons.all()
   })
@@ -1066,6 +1084,7 @@ function addSeason(e) {
 
 function displaySeason(season, e) {
   if (e) stop(e)
+  activateNav('navSeasons')
   displayContent('season_details', {
     season: season
   , players: Players.all()
