@@ -57,7 +57,11 @@ function Score(player) {
   /**
    * Bounty points for each game the player has played in, by game index.
    */
-  this.bonusPoints = []
+  this.bountyPoints = []
+  /**
+   * Fish-chip points for each game the player has played in, by game index.
+   */
+  this.fishChipPoints = []
   /**
    * Number of games won by the player.
    */
@@ -98,10 +102,17 @@ Score.prototype.setScore = function(game, score) {
 }
 
 /**
- * Registers bonus points earned for the given game.
+ * Registers bounty points earned for the given game.
  */
-Score.prototype.setBonusPoints = function(game, bonusPoints) {
-  this.bonusPoints[game.index] = bonusPoints
+Score.prototype.setBountyPoints = function(game, bountyPoints) {
+  this.bountyPoints[game.index] = bountyPoints
+}
+
+/**
+ * Registers bounty points earned for the given game.
+ */
+Score.prototype.setFishChipPoints = function(game, fishChipPoints) {
+  this.fishChipPoints[game.index] = fishChipPoints
 }
 
 /**
@@ -128,8 +139,16 @@ Score.prototype.getAveragePointsPerGame = function() {
   return (scores.sum() / scores.length).toFixed(1)
 }
 
+Score.prototype.getBountyPoints = function() {
+  return this.bountyPoints.sum()
+}
+
+Score.prototype.getFishChipPoints = function() {
+  return this.fishChipPoints.sum()
+}
+
 Score.prototype.getBonusPoints = function() {
-  return this.bonusPoints.sum()
+  return this.getBountyPoints() + this.getFishChipPoints()
 }
 
 Score.prototype.getLowestWeeklyPoints = function() {
@@ -411,16 +430,18 @@ Game.prototype.calculateScores = function(scores) {
     var player = this.results[i]
       , score = Score.getOrCreate(player, scores)
       , placeScore = points[i]
-      , bonusPoints = this.calculateFishChipBonus(player) + this.calculateBountyBonus(player)
+      , fishChipBonus = this.calculateFishChipBonus(player)
+      , bountyBonus = this.calculateBountyBonus(player)
     if (i == 0) {
       score.win()
       if (this.bountyPlayers !== null && this.bountyPlayers.indexOf(player) != -1) {
         this.log(player + ' escaped with his own bounty!')
-        bonusPoints++
+        bountyBonus++
       }
     }
-    score.setScore(this, placeScore + bonusPoints)
-    score.setBonusPoints(this, bonusPoints)
+    score.setScore(this, placeScore + fishChipBonus + bountyBonus)
+    score.setFishChipPoints(this, fishChipBonus)
+    score.setBountyPoints(this, bountyBonus)
   }
 
   for (var i = 0, l = this.knockouts.length; i < l; i++) {
