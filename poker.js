@@ -1114,20 +1114,20 @@ function addGame(season, e) {
       victimEls = [victimEls]
     }
     for (var i = 0, l = perpEls.length; i < l; i++) {
-      var perp = perpEls[i].value
-        , victim = victimEls[i].value
+      var perpId = perpEls[i].value
+        , victimId = victimEls[i].value
         , container = victimEls[i].parentNode
         , help = container.lastChild
         , errorMessage = null
-      if (perp == '' || victim == '') {
+      if (perpId == '' || victimId == '') {
         errorMessage = 'Select a player from each dropdown.'
       }
-      else if (perp == victim) {
+      else if (perpId == victimId) {
         errorMessage ='A player cannot knock themselves out.'
       }
       else {
-        perp = Players.get(parseInt(perp, 10))
-        victim = Players.get(parseInt(victim, 10))
+        var perp = Players.get(parseInt(perpId, 10))
+          , victim = Players.get(parseInt(victimId, 10))
         // Validate that selected players were actually playing in this game
         if (playerPositions && playerPositions.indexOf(perp) == -1) {
           errorMessage = perp.name + " didn't play in this game (no position entered)."
@@ -1146,10 +1146,7 @@ function addGame(season, e) {
           errorMessage = victim.name + ' has already been knocked out.'
         }
         else {
-          knockouts.push([
-            Players.get(parseInt(perp, 10))
-          , Players.get(parseInt(victim, 10))
-          ])
+          knockouts.push([perp, victim])
         }
       }
       if (errorMessage !== null) knockoutsValid = valid = false
