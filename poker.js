@@ -700,9 +700,11 @@ $template('league_table'
 
 $template('index'
 , $if('season'
-  , H1(
-      A({href: '#', click: $handler(displaySeason, 'season')}, '{{ season.name }}')
-    , ' League Table'
+  , DIV({'class': 'page-header'}
+    , H1(
+        A({href: '#', click: $handler(displaySeason, 'season')}, '{{ season.name }}')
+      , ' League Table'
+      )
     )
   , $include('league_table', {scores: $var('season.scores')})
   , $else(
@@ -712,7 +714,9 @@ $template('index'
 )
 
 $template('player_list'
-, H1('Players')
+, DIV({'class': 'page-header'}
+  , H1('Players')
+  )
 , UL($for('player in players'
   , LI(A({href: '#', click: $handler(displayPlayer, 'player')}, '{{ player.name }}'))
   ))
@@ -738,7 +742,9 @@ $template('player_list'
 
 // TODO
 $template('player_details'
-, H1('Player: {{ player.name }}')
+, DIV({'class': 'page-header'}
+  , H1('Player: {{ player.name }}')
+  )
 , H2('All-Time Rankings')
 , $for('season, score in seasonScores'
   , H3(
@@ -772,7 +778,9 @@ $template('player_details'
 )
 
 $template('season_list'
-, H1('Seasons')
+, DIV({'class': 'page-header'}
+  , H1('Seasons')
+  )
 , TABLE({'class': 'table table-striped table-bordered table-condensed'}
   , THEAD(TR(
       TH('Name')
@@ -810,7 +818,9 @@ $template('season_list'
 )
 
 $template('season_details'
-, H1('Season: {{ season.name }}')
+, DIV({'class': 'page-header'}
+  , H1('Season: {{ season.name }}')
+  )
 , H2('League Table')
 , $include('league_table', {scores: $var('season.scores')})
 , H2('Games')
@@ -899,10 +909,12 @@ $template('season_details'
 )
 
 $template('game_details'
-, H1(
-    'Game {{ game.getGameNumber }} in '
-  , A({href: '#', click: $handler(displaySeason, 'game.season')}, '{{ game.season.name }}')
-  , ', played on {{ game.date.toDateString }}'
+, DIV({'class': 'page-header'}
+  , H1(
+      'Game {{ game.getGameNumber }} in '
+    , A({href: '#', click: $handler(displaySeason, 'game.season')}, '{{ game.season.name }}')
+    , ', played on {{ game.date.toDateString }}'
+    )
   )
 , H2('Story of the Game')
 , $for('line in game.story'
