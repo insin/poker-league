@@ -811,9 +811,10 @@ $template('season_details'
             ))
           , TBODY($for('player in players'
             , TR(
-                TD(LABEL({'for': 'position{{ forloop.counter0 }}'}, '{{ player.name }}'))
+                TD(LABEL({'for': 'position{{ forloop.counter }}'}, '{{ player.name }}'))
               , TD(
-                  INPUT({type: 'text', name: 'position', id: 'position{{ forloop.counter0 }}', 'class': 'input-mini'})
+                  INPUT({type: 'hidden', name: 'player', value: '{{ player.id }}'})
+                , INPUT({type: 'text', name: 'position', id: 'position{{ forloop.counter }}', 'class': 'input-mini'})
                 , SPAN({'class': 'help-inline hide'})
                 )
               )
@@ -1033,12 +1034,12 @@ function addGame(season, e) {
   // Player position result input and validation
   var playerPositions = (function() {
     var playerPositionsValid = true
-      , els = Array.prototype.slice.call(form.elements.position)
+      , positions = Array.prototype.slice.call(form.elements.position)
       , resultsHelp = document.getElementById('results-help')
       , resultsContainer = resultsHelp.parentNode.parentNode
       , resultsErrorMessage = null
     // All blank is invalid
-    if (els.filter(function(el) { return el.value != '' }).length == 0) {
+    if (positions.filter(function(el) { return el.value != '' }).length == 0) {
       resultsErrorMessage = 'For each player who played, enter the position they finished in.'
     }
     if (resultsErrorMessage !== null) playerPositionsValid = valid = false
@@ -1046,7 +1047,7 @@ function addGame(season, e) {
 
     // Check that position inputs are valid - keep going even if we detected
     // that all inputs are blank in order to clear individual error messages.
-    els.forEach(function(el) {
+    positions.forEach(function(el) {
       var container = el.parentNode.parentNode
         , help = el.nextSibling
         , errorMessage = null
@@ -1068,13 +1069,13 @@ function addGame(season, e) {
 
     // If we're still good, check for gaps
     var expected = 1
-      , sortedEls = els.slice()
-                       .filter(function(el) { return el.value != '' })
-                       .sort(function(a, b) {
-                          return parseInt(a.value, 10) - parseInt(b.value, 10)
-                        })
-    for (var i = 0, l = sortedEls.length ; i < l; i++) {
-      var el = sortedEls[i]
+      , sorted = positions.slice()
+                          .filter(function(el) { return el.value != '' })
+                          .sort(function(a, b) {
+                             return parseInt(a.value, 10) - parseInt(b.value, 10)
+                           })
+    for (var i = 0, l = sorted.length ; i < l; i++) {
+      var el = sorted[i]
         , position = parseInt(el.value, 10)
         , container = el.parentNode.parentNode
         , help = el.nextSibling
@@ -1093,10 +1094,12 @@ function addGame(season, e) {
 
     // Input looks good, so create player position array
     var playerPositions = []
-    els.forEach(function(el, index) {
+      , players = Array.prototype.slice.call(form.elements.player)
+    positions.forEach(function(el, i) {
       if (el.value != '') {
         var position = parseInt(el.value, 10)
-        playerPositions[position - 1] = Players.get(index)
+          , playerId = parseInt(players[i].value, 10)
+        playerPositions[position - 1] = Players.get(playerId)
       }
     })
     return playerPositions
