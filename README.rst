@@ -7,7 +7,7 @@ A single-page app for tracking poker league results.
 Requirements & design discussion: http://www.rllmukforum.com/index.php?/topic/262021-spreadsheet-help-to-build-a-league-table
 
 Always looking for good ideas for single-page apps in the absence of my own and
-this jumped out at me, as there are a small numbers of entities and pages, but
+this jumped out at me, as there are a small number of entities and pages, but
 a decent amount of complexity.
 
 Implementing it in a very naive way first with very few libs (mostly just
@@ -15,6 +15,6 @@ Implementing it in a very naive way first with very few libs (mostly just
 version and porting it to any app frameworks I want to try out, and eventually
 to use it as a test case for apps which share the same codebase front and back,
 and operate by progressively enhancing full versions of pages which are served
-up.
+up and would otherwise work as forms 'n links webapps.
 
 .. _`DOMBuilder`: https://github.com/insin/DOMBuilder
