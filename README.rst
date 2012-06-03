@@ -4,6 +4,8 @@ Pants McSkill's Poker League
 
 A single-page app for tracking poker league results.
 
+   http://insin.github.com/poker-league/poker.html
+
 Requirements & design discussion: http://www.rllmukforum.com/index.php?/topic/262021-spreadsheet-help-to-build-a-league-table
 
 Always looking for good ideas for single-page apps in the absence of my own and
@@ -18,3 +20,11 @@ and operate by progressively enhancing full versions of pages which are served
 up and would otherwise work as forms 'n links webapps.
 
 .. _`DOMBuilder`: https://github.com/insin/DOMBuilder
+
+Current status:
+
+* Uses ``localStorage`` to persist on every save.
+* Requires a browser which supports ``classList``,
+  ``firstElementChild``/``nextElementSibling`` and Array extras (i.e. get bent,
+  IE).
+* No back button support yet, will use History API.
