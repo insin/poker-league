@@ -791,7 +791,7 @@ $template('season_list'
   ,TABLE({'class': 'table table-striped table-bordered table-condensed'}
     , THEAD(TR(
         TH('Name')
-      , TH('# Games Played')
+      , TH('Games Played')
       ))
     , TBODY($for('season in seasons'
       , TR(
