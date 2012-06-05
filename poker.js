@@ -708,10 +708,12 @@ $template('index'
     )
   , $if('season.games.length'
     , $include('league_table', {scores: $var('season.scores')})
-    , $else('The League Table will begin as soon as some games have been played.')
+    , $else(DIV({'class': 'alert alert-info'}
+      ,'The League Table will begin as soon as some games have been played.'
+      ))
     )
   , $else(
-      P('There are no Seasons set up yet.')
+      DIV({'class': 'alert alert-info'}, 'There are no Seasons set up yet.')
     )
   )
 )
@@ -724,7 +726,7 @@ $template('player_list'
   , UL($for('player in players'
     , LI(A({href: '#', click: $handler(displayPlayer, 'player')}, '{{ player.name }}'))
     ))
-  , $else('None yet - add one below.')
+  , $else(DIV({'class': 'alert alert-info'}, 'None yet - add one below.'))
   )
 , toggleAddButton('Add Player')
 , FORM({id: 'addPlayerForm', 'class': 'form-horizontal hide', submit: addPlayer}
@@ -804,7 +806,7 @@ $template('season_list'
         )
       ))
     )
-  , $else(P('None yet - add one below.'))
+  , $else(DIV({'class': 'alert alert-info'}, 'None yet - add one below.'))
   )
 , toggleAddButton('Add Season')
 , FORM({id: 'addSeasonForm', 'class': 'form-horizontal hide', submit: addSeason}
@@ -848,7 +850,7 @@ $template('season_details'
         )
       ))
     )
-  , $else(P('None yet - add one below.'))
+  , $else(DIV({'class': 'alert alert-info'}, 'None yet - add one below.'))
   )
 , toggleAddButton('Add Game')
 , FORM({id: 'addGameForm', 'class': 'form-horizontal hide', submit: $handler(addGame, 'season')}
@@ -864,21 +866,30 @@ $template('season_details'
     , DIV({'class': 'control-group'}
       , LABEL({'class': 'control-label'}, 'Results')
       , DIV({'class': 'controls'}
-        , TABLE({'class': 'table table-condensed table-controls', style: 'width: auto'}
-          , THEAD(TR(
-              TH({style: 'width: 150px'}, 'Player')
-            , TH({style: 'width: 350px'}, 'Position')
-            ))
-          , TBODY($for('player in players'
-            , TR(
-                TD(LABEL({'for': 'position{{ forloop.counter }}'}, '{{ player.name }}'))
-              , TD(
-                  INPUT({type: 'hidden', name: 'player', value: '{{ player.id }}'})
-                , INPUT({type: 'text', name: 'position', id: 'position{{ forloop.counter }}', 'class': 'input-mini'})
-                , SPAN({'class': 'help-inline hide'})
+        , $if('players.length'
+          , TABLE({'class': 'table table-condensed table-controls', style: 'width: auto'}
+            , THEAD(TR(
+                TH({style: 'width: 150px'}, 'Player')
+              , TH({style: 'width: 350px'}, 'Position')
+              ))
+            , TBODY($for('player in players'
+              , TR(
+                  TD(LABEL({'for': 'position{{ forloop.counter }}'}, '{{ player.name }}'))
+                , TD(
+                    INPUT({type: 'hidden', name: 'player', value: '{{ player.id }}'})
+                  , INPUT({type: 'text', name: 'position', id: 'position{{ forloop.counter }}', 'class': 'input-mini'})
+                  , SPAN({'class': 'help-inline hide'})
+                  )
                 )
+              ))
+            )
+          , $else(
+              DIV({'class': 'alert alert-info'}
+              , 'There are no Players registered yet - add some on the '
+              , A({href: '#', click: playersList}, 'Players')
+              , ' page.'
               )
-            ))
+            )
           )
         , P({'class': 'help-block hide', id: 'results-help'})
         )
@@ -919,7 +930,9 @@ $template('season_details'
 , H2('League Table')
 , $if('season.games.length'
   , $include('league_table', {scores: $var('season.scores')})
-  , $else('The League Table will begin as soon as some games have been played.')
+  , $else(DIV({'class': 'alert alert-info'}
+    ,'The League Table will begin as soon as some games have been played.'
+    ))
   )
 )
 
@@ -1132,7 +1145,7 @@ function addGame(season, e) {
   // Player position result input and validation
   var playerPositions = (function() {
     var playerPositionsValid = true
-      , positions = Array.prototype.slice.call(form.elements.position)
+      , positions = Array.prototype.slice.call(form.elements.position || [])
       , resultsHelp = document.getElementById('results-help')
       , resultsContainer = resultsHelp.parentNode.parentNode
       , resultsErrorMessage = null
