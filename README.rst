@@ -1,6 +1,8 @@
-============================
-Pants McSkill's Poker League
-============================
+===================================
+|icon| Pants McSkill's Poker League
+===================================
+
+.. |icon| image:: https://github.com/insin/poker-league/raw/master/img/icon.png
 
 A single-page app for tracking poker league results.
 
@@ -28,3 +30,8 @@ Current status:
   ``firstElementChild``/``nextElementSibling`` and Array extras (i.e. get bent,
   IE).
 * No back button support yet, will use History API.
+
+"Playing Card" symbol by Jonathan C. Dietrich, from `The Noun Project`_
+collection.
+
+.. `The Noun Project`: http://www.thenounproject.com/
