@@ -34,4 +34,4 @@ Current status:
 "Playing Card" symbol by Jonathan C. Dietrich, from `The Noun Project`_
 collection.
 
-.. `The Noun Project`: http://www.thenounproject.com/
+.. _`The Noun Project`: http://www.thenounproject.com/
